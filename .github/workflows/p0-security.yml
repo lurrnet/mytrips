@@ -1,0 +1,71 @@
+name: P0 deployment policy
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check static deployment guardrails
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("deploy/oci/compose.yaml").read_text()
+          assert "127.0.0.1:${PARTIU_PORT:-8000}:8000" in s
+          assert "25:2525" not in s and "2525:2525" not in s
+          assert 'DISABLE_SMTP_SERVER: "true"' in s
+          assert 'PHOTON_URL: ""' in s
+          assert 'OLLAMA_URL: ""' in s
+          assert 'DEMO_MODE: "false"' in s
+          assert "image: ${PARTIU_IMAGE:?" in s
+          print("P0 static policy PASS")
+          PY
+
+  backup-restore:
+    name: Cold backup + restore drill (synthetic SQLite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Provision disposable sample data
+        run: |
+          cat > .env <<'EOF'
+          PARTIU_IMAGE=ghcr.io/lurrnet/mytrips@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          SECRET_KEY=ci-backup-synthetic-secret-please-do-not-use
+          PARTIU_VERSION=0.1.0
+          EOF
+          mkdir -p data
+          python3 - <<'PY'
+          import sqlite3
+          with sqlite3.connect("data/partiu.db") as db:
+              db.execute("create table restore_fixture (value text not null)")
+              db.execute("insert into restore_fixture (value) values ('original')")
+          PY
+      - name: Validate resolved Compose policy
+        run: bash deploy/oci/check-config.sh
+      - name: Backup synthetic data
+        env:
+          PARTIU_BACKUP_DIR: ${{ runner.temp }}/mytrips-backup
+        run: bash deploy/oci/backup.sh
+      - name: Mutate and restore synthetic data
+        env:
+          PARTIU_BACKUP_DIR: ${{ runner.temp }}/mytrips-backup
+        run: |
+          python3 - <<'PY'
+          import sqlite3
+          with sqlite3.connect("data/partiu.db") as db:
+              db.execute("update restore_fixture set value = 'changed'")
+          PY
+          archive="$(find "$PARTIU_BACKUP_DIR" -name 'mytrips-*.tar.gz' -print -quit)"
+          test -n "$archive"
+          bash deploy/oci/restore.sh --apply "$archive"
+          python3 - <<'PY'
+          import sqlite3
+          with sqlite3.connect("data/partiu.db") as db:
+              assert db.execute("select value from restore_fixture").fetchone() == ("original",)
+          print("P0 synthetic cold backup/restore PASS")
+          PY

@@ -211,6 +211,13 @@ def _process_raw_message(raw_msg, sender_address: str, user_id: int | None = Non
 
 
 def start_smtp_server():
+    from .config import settings
+
+    # Hard deployment policy: an admin/SQLite setting cannot activate the SMTP listener.
+    if settings.DISABLE_SMTP_SERVER:
+        logger.info("SMTP listener disabled by deployment policy")
+        return
+
     from .database import get_global_setting
 
     global _controller
