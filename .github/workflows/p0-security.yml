@@ -11,19 +11,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Check static deployment guardrails
+      - name: Check local-build deployment guardrails
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          s=Path("deploy/oci/compose.yaml").read_text()
-          assert "127.0.0.1:${PARTIU_PORT:-8000}:8000" in s
-          assert "25:2525" not in s and "2525:2525" not in s
-          assert 'DISABLE_SMTP_SERVER: "true"' in s
-          assert 'PHOTON_URL: ""' in s
-          assert 'OLLAMA_URL: ""' in s
-          assert 'DEMO_MODE: "false"' in s
-          assert "image: ${PARTIU_IMAGE:?" in s
-          print("P0 static policy PASS")
+          root=Path("docker-compose.yml").read_text()
+          oci=Path("deploy/oci/compose.yaml").read_text()
+          dockerfile=Path("Dockerfile").read_text()
+          assert "build:" in root and "context: ." in root
+          assert "build:" in oci and "context: ../.." in oci
+          for s in (root,oci,dockerfile):
+              assert "ghcr.io" not in s, "build/deploy must not depend on GHCR"
+          for s in (root,oci):
+              assert "image: mytrips:${MYTRIPS_VERSION:-0.1.0}" in s
+              assert '127.0.0.1:${PARTIU_PORT:-8000}:8000' in s
+              assert "25:2525" not in s and "2525:2525" not in s
+              assert 'DISABLE_SMTP_SERVER: "true"' in s
+              assert 'DISABLE_SCHEDULER: "true"' in s
+              assert 'PHOTON_URL: ""' in s
+              assert 'OLLAMA_URL: ""' in s
+              assert 'DEMO_MODE: "false"' in s
+          assert not Path(".github/workflows/build.yml").exists()
+          assert not Path(".github/workflows/p0-arm64-build.yml").exists()
+          print("P0 local build, no registry publish: PASS")
           PY
 
   backup-restore:
@@ -34,9 +44,9 @@ jobs:
       - name: Provision disposable sample data
         run: |
           cat > .env <<'EOF'
-          PARTIU_IMAGE=ghcr.io/lurrnet/mytrips@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          MYTRIPS_VERSION=0.1.0
+          PARTIU_VERSION=2.6.9
           SECRET_KEY=ci-backup-synthetic-secret-please-do-not-use
-          PARTIU_VERSION=0.1.0
           EOF
           mkdir -p data
           python3 - <<'PY'

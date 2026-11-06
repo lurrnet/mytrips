@@ -16,7 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Python deps
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Install a pinned uv CLI via PyPI: no GHCR image used by this Dockerfile.
+RUN python -m pip install --no-cache-dir uv==0.9.7
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
@@ -40,6 +41,6 @@ COPY scripts/ ./scripts/
 # Persistent data volume mount point
 RUN mkdir -p /app/data
 
-EXPOSE 8000 2525
+EXPOSE 8000
 
 CMD ["uv", "run", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

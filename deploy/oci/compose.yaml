@@ -1,8 +1,12 @@
-# P0 OCI deployment. Run from repository root using -f deploy/oci/compose.yaml.
+# Native local build for OCI Ampere A1 (linux/arm64), no registry image dependency.
+# Run from repository root: docker compose --env-file .env -f deploy/oci/compose.yaml up -d --build
 name: mytrips
 services:
   app:
-    image: ${PARTIU_IMAGE:?Set digest-pinned PARTIU_IMAGE, e.g. ghcr.io/lurrnet/mytrips@sha256:...}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: mytrips:${MYTRIPS_VERSION:-0.1.0}
     platform: linux/arm64
     restart: unless-stopped
     init: true

@@ -1,53 +1,67 @@
-# MyTrips P0.1–P0.3 — initial implementation
+# MyTrips v0.1.0 — OCI Native Build
 
-**Fork:** `lurrnet/mytrips` (upstream `thiagodsti/partiu`).
-**Baseline:** `v2.6.9`, commit `2510371e9c61faabe2dc636aa02edbb765862dc3`.
-**Status:** v0.1.0 initial staging release candidate. CI covers basic Docker build, unit tests, security config, and synthetic cold backup/restore. Real ARM64 image build and OCI end-to-end smoke still require verification.
+Repository: `lurrnet/mytrips`, fork of `thiagodsti/partiu`.
+Upstream baseline: Partiu v2.6.9 (`2510371e9c61faabe2dc636aa02edbb765862dc3`).
+MyTrips version: `MYTRIPS_VERSION=0.1.0`; upstream feature-version variable: `PARTIU_VERSION=2.6.9`.
 
-## P0.1 — Upstream sync and isolation
-Keep changes in feature branches, merge after PR checks; `scripts/sync-upstream-safely.sh` creates an isolated upstream-merge branch from clean local `main`.
-Do not rewrite upstream history. Keep `data/` and `.env` ignored.
+## Policy
 
-## P0.2 — Security and release controls
-Use `deploy/oci/compose.yaml` on OCI, **not** upstream root `docker-compose.yml`, which publishes SMTP port 25 and HTTP on all interfaces.
-The OCI deployment binds only `127.0.0.1:8000`; config forces `DISABLE_SMTP_SERVER=true` even if SQLite settings say enabled.
-The SMTP kill switch requires **our custom built image**. Do not use unpatched `ghcr.io/thiagodsti/partiu`.
-No public SMTP, no default outbound Photon queries, no Ollama LLM forwarding, no demo mode. Cloudflare Tunnel + Access required before access over internet.
-`PARTIU_IMAGE` must have an actual `@sha256:<64 hex>` digest. Never use `latest` for OCI.
-Production hardening still needs review of base-image pins, dependency advisories, outbound enrichment APIs, admin setup, CSRF/rate limits, sensitive email parsing, and CI/e2e results.
-The supplied PR workflow checks static deployment guardrails; upstream CI contains non-blocking browser E2E tests.
+- **Build and run directly on OCI**, never publish MyTrips container images to a registry.
+- Use either `deploy/oci/compose.yaml` (ARM64) or root `docker-compose.yml`. Both use `build:`, a local `mytrips:0.1.0` image tag, and bind HTTP to localhost.
+- GitHub CI still runs tests and a local Docker build smoke check; it does not push images. Both image publishing workflows were removed.
+- The Dockerfile installs pinned `uv` from Python packages instead of copying binaries from GHCR.
+- `DISABLE_SMTP_SERVER=true` is enforced by the patched backend regardless of admin settings. No SMTP host port is published. Scheduler, LLM, and Photon lookups disabled in the OCI deployment.
+- Keep the Cloudflare Tunnel and Access separate; do not expose the app with a public host bind.
+- Base images and build dependencies are still downloaded from Docker Hub, apt repositories, npm, and PyPI; **no container registry is required to host MyTrips itself**. OCI needs outbound network for the first build.
+- This is initial staging hardening, not a complete security audit. Review third-party data lookups, dependency vulnerabilities and email/PDF parser threats before real use.
 
-## P0.3 — OCI ARM64 staging
-After reviewed PR merges, **P0 ARM64 pinned image** automatically builds on `main`. Copy `PARTIU_IMAGE=...@sha256:...` from its log, job summary, or uploaded `mytrips-arm64-image-ref` artifact. If the package is private, authenticate with GHCR using a least-privilege read:packages token, or mark the package public.
-On an OCI Ampere A1 host with Docker Compose and a **local** Cloudflare Tunnel:
+## Deploy on OCI Ampere A1
+
+Assumes Docker Engine, Compose plugin and Git are installed.
 
 ```sh
+cd ~/github
 git clone https://github.com/lurrnet/mytrips.git
 cd mytrips
 cp .env.example .env
 chmod 600 .env
-# Edit .env: SECRET_KEY=<openssl rand -hex 32 output>, PARTIU_VERSION=0.1.0
-# Append: PARTIU_IMAGE=ghcr.io/lurrnet/mytrips@sha256:<real digest>
-mkdir -p data
-chmod 700 data
+sed -i "s/^SECRET_KEY=.*/SECRET_KEY=$(openssl rand -hex 32)/" .env
+mkdir -p data && chmod 700 data
+
 bash deploy/oci/check-config.sh
-docker compose --env-file .env -f deploy/oci/compose.yaml up -d
+docker compose --env-file .env -f deploy/oci/compose.yaml up -d --build
 docker compose --env-file .env -f deploy/oci/compose.yaml ps
 curl -fsS http://127.0.0.1:8000/manifest.json
 ```
 
-The Compose config uses relative `../../.env` and `../../data` from `deploy/oci/`, resolved to the repository root.
-Cloudflare Tunnel origin should target `http://127.0.0.1:8000` **only if cloudflared runs on the same host**.
-Protect hostname with Cloudflare Access, verify HTTPS secure cookies.
-Use synthetic emails/trips/hotel confirmations during smoke tests. Do not enter real reservation data before the audit is finished. The source code still uses Partiu identifiers; MyTrips is the fork/distribution name.
+If port 8000 is occupied, add `PARTIU_PORT=8005` to `.env` and use `127.0.0.1:8005` in curl and Cloudflare Tunnel origin.
+Cloudflare Tunnel origin `http://127.0.0.1:<port>` assumes cloudflared runs **on the same host**. Protect it with Cloudflare Access.
+Use synthetic data for the initial smoke test.
 
-## Backup and restore acceptance
-`PARTIU_BACKUP_DIR=/var/backups/mytrips bash deploy/oci/backup.sh` produces archive + SHA256; stopping the container ensures consistent SQLite/WAL + attachments.
-`bash deploy/oci/restore.sh --apply /var/backups/mytrips/<archive>.tar.gz` validates checksums, archive types, and SQLite integrity. **Destructive** to live `data/`; old data is renamed, never auto-deleted. Test against a separate staging checkout first. Secrets in `.env` are not backed up.
-Archive contains personal travel history and documents: restrict access and encrypt when off-host. Add Dockback integration only after a restore drill.
+## Routine updates
 
-## Release guardrails
-- The image is built natively for Linux ARM64 by the main-branch GitHub workflow; no `latest` in the OCI Compose.
-- Inspect Actions workflow, digest, and published package visibility before deploying. A successful build is **not** evidence an OCI VM has run the image.
-- Container-side startup settings force the scheduler and SMTP listener off. This first version supports manual entry and import, but forwarding automation is deferred to P1.
-- Bind the service to localhost; Cloudflare Tunnel and Access must be configured separately on the host.
+Review upstream changes in a branch via `scripts/sync-upstream-safely.sh`.
+After changes are reviewed, tested, and merged, on OCI:
+
+```sh
+cd ~/github/mytrips
+git fetch origin
+git switch main
+git pull --ff-only origin main
+bash deploy/oci/check-config.sh
+docker compose --env-file .env -f deploy/oci/compose.yaml up -d --build
+```
+
+For reproducibility, note the Git commit SHA or tag deployed. Local image tag `mytrips:0.1.0` is overwritten on a rebuild; to retain rollback images tag them with a distinct name **before** rebuilding.
+
+## Backup and restore
+
+`PARTIU_BACKUP_DIR=/var/backups/mytrips bash deploy/oci/backup.sh` stops the container, archives SQLite and files, validates gzip, writes a SHA256 checksum, then restarts it.
+`bash deploy/oci/restore.sh --apply /var/backups/mytrips/mytrips-<timestamp>.tar.gz` verifies checksum and archive contents, stops the app, preserves old data under a renamed directory, restores and verifies SQLite integrity.
+**Restore replaces live data. Test it in a separate staging checkout before real data.** The `.env` secret is not archived and must be backed up separately.
+Backups contain sensitive travel records; restrict and encrypt off-host copies.
+
+## Privacy and Cloudflare email forwarding
+
+P1 will introduce Cloudflare Email Routing → Email Worker → authenticated MyTrips API. Until then, SMTP is deliberately disabled and manual entry / upload can be used.
+The existing Partiu update checker talks to GitHub (not GHCR); if avoiding this optional outbound lookup is also desired, it requires a separate setting/change.
