@@ -1,0 +1,27 @@
+name: P0 deployment policy
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check static deployment guardrails
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("deploy/oci/compose.yaml").read_text()
+          assert "127.0.0.1:${PARTIU_PORT:-8000}:8000" in s
+          assert "25:2525" not in s and "2525:2525" not in s
+          assert 'DISABLE_SMTP_SERVER: "true"' in s
+          assert 'PHOTON_URL: ""' in s
+          assert 'OLLAMA_URL: ""' in s
+          assert 'DEMO_MODE: "false"' in s
+          assert "image: ${PARTIU_IMAGE:?" in s
+          print("P0 static policy PASS")
+          PY
