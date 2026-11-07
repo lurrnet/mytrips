@@ -1,5 +1,7 @@
 # Partiu ✈️
 
+> **MyTrips self-hosted fork:** OCI Docker deployments use host port **8030** by default. Configure `MYTRIPS_PORT=8030` in the repository root `.env` (see [OCI deployment guide](docs/P0_SECURITY_AND_DEPLOYMENT.md)). The application still listens on 8000 inside the container.
+
 [![CI](https://github.com/thiagodsti/partiu/actions/workflows/pr.yml/badge.svg?branch=main)](https://github.com/thiagodsti/partiu/actions/workflows/pr.yml)
 [![codecov](https://codecov.io/github/thiagodsti/partiu/branch/main/graph/badge.svg?token=7UC9WJZP8J)](https://codecov.io/github/thiagodsti/partiu)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
