@@ -119,7 +119,7 @@ BuiltinAirlineRule(
 ),
 ```
 
-> **Forwarded emails**: if users will forward the email to Partiu (rather than having it synced directly), the outer `From` header will be their personal address, not the airline's. The rule will still match because the engine also scans the email body for embedded `From:` and `Subject:` lines from the forwarded message.
+> **Forwarded emails**: if users will forward the email to MyTrips (rather than having it synced directly), the outer `From` header will be their personal address, not the airline's. The rule will still match because the engine also scans the email body for embedded `From:` and `Subject:` lines from the forwarded message.
 
 After adding the rule, bump `RULES_VERSION` by 1 (e.g. `'13'` → `'14'`). This triggers a full rescan of existing emails.
 

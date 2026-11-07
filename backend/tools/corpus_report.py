@@ -9,7 +9,7 @@ Options:
                     with message_id, sender, subject, body, html_body, date and
                     base64 pdf_attachments, as written by the sync's cache.
     --db FILE       SQLite database with a populated airports table (default:
-                    data/partiu.db). Name resolution is silently disabled without
+                    data/mytrips.db). Name resolution is silently disabled without
                     one, so measuring against an empty DB understates coverage.
     --json FILE     Also write every per-email row to FILE.
     --quiet         Print the per-rule table only, without the per-email lists.
@@ -251,7 +251,7 @@ def render(summary: dict, *, quiet: bool = False) -> str:
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Measure parser coverage over a cached email corpus.")
     p.add_argument("--cache", default="data/email_cache.json", help="Corpus JSON file")
-    p.add_argument("--db", default="data/partiu.db", help="SQLite DB with an airports table")
+    p.add_argument("--db", default="data/mytrips.db", help="SQLite DB with an airports table")
     p.add_argument("--json", default="", help="Write per-email rows to this JSON file")
     p.add_argument("--quiet", action="store_true", help="Per-rule table only")
     return p.parse_args(argv)

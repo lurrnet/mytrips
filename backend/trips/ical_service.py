@@ -188,7 +188,7 @@ class IcalService:
         lines = [
             "BEGIN:VCALENDAR",
             "VERSION:2.0",
-            "PRODID:-//Partiu//Trip Export//EN",
+            "PRODID:-//MyTrips//Trip Export//EN",
             "CALSCALE:GREGORIAN",
             "METHOD:PUBLISH",
             f"X-WR-CALNAME:{_escape(trip_name)}",

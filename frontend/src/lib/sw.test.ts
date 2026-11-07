@@ -48,7 +48,7 @@ function loadServiceWorker() {
     addEventListener: (type: string, fn: FetchHandler) => {
       listeners[type] = fn;
     },
-    location: { origin: 'https://partiu.test' },
+    location: { origin: 'https://mytrips.test' },
     clients: { claim: () => {} },
     skipWaiting: () => {},
     caches: undefined as unknown,
@@ -56,7 +56,7 @@ function loadServiceWorker() {
 
   const caches = {
     open: async () => cache,
-    keys: async () => ['partiu-api-v21'],
+    keys: async () => ['mytrips-api-v22'],
     delete: async () => true,
     match: async (req: Request) => cacheEntries.get(req.url),
   };
@@ -101,10 +101,10 @@ describe('service worker API routing', () => {
       }),
     );
     // Something in the cache to purge.
-    cacheEntries.set('https://partiu.test/api/trips/t1/budget', new Response('{"amount":500}'));
+    cacheEntries.set('https://mytrips.test/api/trips/t1/budget', new Response('{"amount":500}'));
 
     await dispatch(
-      new Request('https://partiu.test/api/trips/t1/budget', { method: 'PUT' }),
+      new Request('https://mytrips.test/api/trips/t1/budget', { method: 'PUT' }),
     );
 
     /* The whole point: by the time the page sees the PUT resolve, the stale copy
@@ -117,9 +117,9 @@ describe('service worker API routing', () => {
   it('leaves the cache alone when the mutation fails', async () => {
     loadServiceWorker();
     vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 500 })));
-    cacheEntries.set('https://partiu.test/api/trips/t1/budget', new Response('{"amount":500}'));
+    cacheEntries.set('https://mytrips.test/api/trips/t1/budget', new Response('{"amount":500}'));
 
-    await dispatch(new Request('https://partiu.test/api/trips/t1/budget', { method: 'PUT' }));
+    await dispatch(new Request('https://mytrips.test/api/trips/t1/budget', { method: 'PUT' }));
 
     // A rejected write changed nothing on the server; dropping the cache would
     // only cost a round trip.

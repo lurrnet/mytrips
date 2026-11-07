@@ -1,6 +1,6 @@
 """Configuration status of the optional third-party integrations.
 
-Every integration here is optional: Partiu runs without any of them, each one
+Every integration here is optional: MyTrips runs without any of them, each one
 degrading a specific feature rather than breaking the app. That is why this is
 a **status report and not a warning** — it is logged at INFO, never surfaced as
 a banner, and an unconfigured integration is a legitimate choice rather than a

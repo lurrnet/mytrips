@@ -26,23 +26,23 @@ describe('purgeApiCache', () => {
   });
 
   it('drops every versioned API cache', () => {
-    const deleted = stubCaches(['partiu-api-v20', 'partiu-api-v21']);
+    const deleted = stubCaches(['partiu-api-v20', 'partiu-api-v21', 'mytrips-api-v22']);
 
     return purgeApiCache().then(() => {
       // Old versions too: an install that has not activated the new worker yet
       // still holds the previous account's answers.
-      expect(deleted.sort()).toEqual(['partiu-api-v20', 'partiu-api-v21']);
+      expect(deleted.sort()).toEqual(['partiu-api-v20', 'partiu-api-v21', 'mytrips-api-v22'].sort());
     });
   });
 
   it('leaves the static caches alone', async () => {
-    const deleted = stubCaches(['partiu-api-v21', 'partiu-static-v21', 'other-app-cache']);
+    const deleted = stubCaches(['partiu-api-v21', 'mytrips-api-v22', 'partiu-static-v21', 'mytrips-static-v22', 'other-app-cache']);
 
     await purgeApiCache();
 
     // The app shell and its assets are the same for everyone; re-downloading
     // them on every sign-in would cost a cold start for no privacy gained.
-    expect(deleted).toEqual(['partiu-api-v21']);
+    expect(deleted.sort()).toEqual(['mytrips-api-v22', 'partiu-api-v21'].sort());
   });
 
   it('does nothing where CacheStorage is unavailable', async () => {

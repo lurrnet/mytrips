@@ -79,7 +79,7 @@ class TwoFAService:
             secret = pyotp.random_base32()
             self._repository.set_totp_secret(user["id"], secret)
 
-        uri = pyotp.TOTP(secret).provisioning_uri(name=user["username"], issuer_name="Partiu")
+        uri = pyotp.TOTP(secret).provisioning_uri(name=user["username"], issuer_name="MyTrips")
         return TwoFASetup(secret=secret, uri=uri)
 
     def enable_2fa(self, user_id: int, code: str) -> None:
