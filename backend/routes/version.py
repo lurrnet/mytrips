@@ -14,13 +14,13 @@ from ..auth import get_current_user
 
 router = APIRouter(prefix="/api/version", tags=["version"])
 
-GITHUB_REPO = "thiagodsti/partiu"
+GITHUB_REPO = "lurrnet/mytrips"
 _cache: dict = {"ts": 0.0, "latest": None}
 _CACHE_TTL = 6 * 3600  # 6 hours
 
 
 def get_current_version() -> str:
-    return os.environ.get("PARTIU_VERSION", "dev").strip()
+    return os.environ.get("MYTRIPS_VERSION", os.environ.get("PARTIU_VERSION", "dev")).strip()
 
 
 def _fetch_latest_version() -> str | None:
@@ -29,7 +29,7 @@ def _fetch_latest_version() -> str | None:
         return _cache["latest"]
     try:
         url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-        req = urllib.request.Request(url, headers={"User-Agent": "partiu-app"})
+        req = urllib.request.Request(url, headers={"User-Agent": "mytrips-app"})
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read())
             tag = data.get("tag_name", "").lstrip("v")

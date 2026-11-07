@@ -1,12 +1,12 @@
-# Partiu ✈️
+# MyTrips ✈️
 
 > **MyTrips self-hosted fork:** OCI Docker deployments use host port **8030** by default. Configure `MYTRIPS_PORT=8030` in the repository root `.env` (see [OCI deployment guide](docs/P0_SECURITY_AND_DEPLOYMENT.md)). The application still listens on 8000 inside the container.
 
-[![CI](https://github.com/thiagodsti/partiu/actions/workflows/pr.yml/badge.svg?branch=main)](https://github.com/thiagodsti/partiu/actions/workflows/pr.yml)
-[![codecov](https://codecov.io/github/thiagodsti/partiu/branch/main/graph/badge.svg?token=7UC9WJZP8J)](https://codecov.io/github/thiagodsti/partiu)
+[![CI](https://github.com/lurrnet/mytrips/actions/workflows/pr.yml/badge.svg?branch=main)](https://github.com/lurrnet/mytrips/actions/workflows/pr.yml)
+<!-- Upstream Codecov badge removed: it belongs to a different repository. -->
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Partiu** is a self-hosted alternative to TripIt — a personal flight tracker PWA that automatically reads your airline confirmation emails, parses the flight details, and organises everything into trips. No third-party account needed, no data leaving your server.
+**MyTrips** is a self-hosted fork of [Partiu](https://github.com/thiagodsti/partiu), an alternative to TripIt — a personal flight tracker PWA that automatically reads your airline confirmation emails, parses the flight details, and organises everything into trips. No third-party account needed, no data leaving your server.
 
 ---
 
@@ -14,7 +14,7 @@
 
 ## Live demo
 
-Want to try it before self-hosting? A public demo is available at:
+The original Partiu project maintains a public demo (not operated by MyTrips) at:
 
 **[https://partiu-demo.teda.work](https://partiu-demo.teda.work)**
 
@@ -38,7 +38,7 @@ Want to try it before self-hosting? A public demo is available at:
 - **Airline-independent GDS e-ticket parser**: passenger receipts issued through Amadeus, Sabre and Travelport (ITR / ITR-EMD) share a small set of layouts, so a single parser reads them for any issuing airline — the HTML table form, the compact one-line-per-leg form found in PDF attachments, and the fixed-column plain-text form some airlines send in a monospace body, including per-leg terminals and connections. Its results are merged with the airline's own parser, which recovers legs an airline-specific rule can miss on multi-carrier itineraries
 - **Turkish Airlines ticket mails**: TK sends its own branded "Ticket Details" document rather than a GDS receipt, so it gets a dedicated parser that reads both of its renderings — the HTML itinerary and, if that is missing, the attached `TicketDetails.pdf` — including connections, overnight arrivals and the Turkish-language version
 - **Pegasus Airlines confirmations**: PC's Turkish-language booking mail carries no attachment at all, so its dedicated parser reads the HTML leg blocks directly, taking each leg's date from the header above it (never from the "check-in opens" date at the top of the mail) and picking up per-leg terminals along the way
-- **A trip says who is on it.** Its People section lists the owner, collaborators, outstanding invitations and guests — companions with no Partiu account — and the guests you add there are exactly who that trip's expenses can be paid by and split between. Guests are per trip, so your travel companions on one trip are not suggested on an unrelated one. The add box is a type-ahead over the people you have travelled with, so a companion is picked rather than retyped; a name already on the trip says so instead of adding them twice. Taking someone off a trip asks first and leaves them in your address book, and deleting a guest outright names the trips they are on before it removes them from those too
+- **A trip says who is on it.** Its People section lists the owner, collaborators, outstanding invitations and guests — companions with no MyTrips account — and the guests you add there are exactly who that trip's expenses can be paid by and split between. Guests are per trip, so your travel companions on one trip are not suggested on an unrelated one. The add box is a type-ahead over the people you have travelled with, so a companion is picked rather than retyped; a name already on the trip says so instead of adding them twice. Taking someone off a trip asks first and leaves them in your address book, and deleting a guest outright names the trips they are on before it removes them from those too
 - **Nothing is lost on delete.** Deleting a trip or a flight moves it to a trash in Settings with everything that was on it — notes, ratings, expenses, stays, documents — from where it can be restored or deleted for good, and an activity log records deletions, restores, merges and syncs. Deleting still frees the booking to be imported again, which is what you do when a parser read it wrongly
 - **A parser update re-reads your mail.** The first sync after an upgrade that changes the parsers looks back over the whole lookback window, and Full sync now re-reads everything it fetches rather than skipping mail it has seen before
 - **Schedule changes reach flights you already have.** A change mail that reprints the itinerary updates the stored leg and keeps the times it moved from, so the flight shows "Rescheduled" with the previous departure and arrival and you get a notification; a leg moved to another day is recognised as the same leg rather than added beside it; and an airline's notice that a booking has changed without listing the new times (SAS) flags every leg of that booking and points you at the airline
@@ -70,7 +70,7 @@ Want to try it before self-hosting? A public demo is available at:
 - Calendar-style day notes per trip
 - Trip expenses: itemised spend tracking per trip (description, amount, currency); totals grouped by currency shown on trip cards and detail page; 41 supported currencies; per-user default currency
 - Expense splitting: each expense records who paid (a collaborator or a guest) and who it's split between (equal shares); shows who added each expense; per-trip balances (net owed/owing) per currency. You appear in the payer list under your own name, marked "(you)" — you are on the trip like everyone else, so there is no separate "Me" entry offering the same person twice
-- Guests: a reusable per-user address book of non-account trip companions (e.g. family/friends) for splitting expenses with people who don't have a Partiu account; manage (add, rename, delete) your guests from Settings. **A name is a person, not a row**: typing one you have used before reuses that guest instead of creating a second one, ignoring case and accents (`jimmy` and `JIMMY` are Jimmy; `joao` is `João`), and renaming a guest onto another's name is refused rather than silently merging two people's expense histories
+- Guests: a reusable per-user address book of non-account trip companions (e.g. family/friends) for splitting expenses with people who don't have a MyTrips account; manage (add, rename, delete) your guests from Settings. **A name is a person, not a row**: typing one you have used before reuses that guest instead of creating a second one, ignoring case and accents (`jimmy` and `JIMMY` are Jimmy; `joao` is `João`), and renaming a guest onto another's name is refused rather than silently merging two people's expense histories
 
 ### Trip budget
 - Set a spending limit per trip. The bar reads as a traffic light that deepens as it fills: pale green at the start, strong green as it runs on, then pale amber at 80% deepening to strong, then red the moment you reach the limit
@@ -79,7 +79,7 @@ Want to try it before self-hosting? A public demo is available at:
 - The trip's summary line carries it too — `🎯 EUR 255 / EUR 800`, in the same colour as the bar — so you can see where you stand without scrolling
 - The people picker (shared with expense splitting) is a type-ahead: chosen companions show as removable tags, and typing a name offers the rest — so a trip with twenty companions takes up no more of the form than a trip with two. Focusing the box lists everyone, and accents are optional (`joao` finds `João`). It only ever offers people actually on *that* trip: its collaborators and the guests already tagged on it
 - **Share it with whoever you're travelling with.** Two people on one purse want one bar, not two half-budgets filling in lockstep — so a budget can name several people and then counts their **combined** share. Every bill split between the two of you comes off it in full, whoever paid; a dinner split three ways with a friend still only costs the pair their two thirds
-- A companion with no Partiu account can share a budget too — add them as a guest, the same way you split a bill with them
+- A companion with no MyTrips account can share a budget too — add them as a guest, the same way you split a bill with them
 - Someone you share a budget with opens the trip and sees the same bar and the same numbers, without setting anything up. They can adjust it, and the panel says whose budget it is. A budget you set yourself always wins over one shared with you
 - Not shared by default: a budget you set alone is yours alone, and two people sharing a trip who want separate limits each keep their own
 - Spend in other currencies is listed beside the bar and never converted, because the app has no exchange rates and a converted figure would be a guess dressed as a fact
@@ -128,7 +128,7 @@ Want to try it before self-hosting? A public demo is available at:
 - Passenger name and seat parsed from BCBP data
 
 ### Trip sharing & collaboration
-- Invite other Partiu users to a trip by username
+- Invite other MyTrips users to a trip by username
 - Pending / accepted / rejected invitation states with an in-app Invitations page
 - Trusted users list: invitations from trusted users are auto-accepted
 - Shared collaborators get full read/write access on trip content
@@ -242,7 +242,7 @@ More airlines can be added by contributing a new rule (see [Contributing](#contr
 
 ## Self-hosting
 
-Partiu is designed to run on your own server — a VPS, a Raspberry Pi, or anything that can run Docker. Your flight data stays on your machine.
+MyTrips is designed to run on your own server — a VPS, a Raspberry Pi, or anything that can run Docker. Your flight data stays on your machine.
 
 ### Requirements
 
@@ -253,8 +253,8 @@ Partiu is designed to run on your own server — a VPS, a Raspberry Pi, or anyth
 ### Deploy with Docker Compose
 
 ```bash
-git clone https://github.com/your-username/partiu
-cd partiu
+git clone https://github.com/lurrnet/mytrips.git
+cd mytrips
 cp .env.example .env
 # Edit .env — at minimum set SECRET_KEY (see below)
 docker compose up -d --build
@@ -266,6 +266,7 @@ Open `https://your-domain` and complete the first-run setup to create your admin
 
 | Variable | Required | Description |
 |---|---|---|
+| `MYTRIPS_PORT` | | OCI host port (default `8030`); container stays on `8000` |
 | `SECRET_KEY` | ✓ | Secret key for signing session cookies. Generate with `openssl rand -hex 32` |
 | `DB_PATH` | | Path to the SQLite database (default: `./data/mytrips.db`) |
 | `DISABLE_SCHEDULER` | | Set to `true` to disable background email sync (useful for dev) |
@@ -279,7 +280,8 @@ Open `https://your-domain` and complete the first-run setup to create your admin
 | `DEMO_MODE` | | Set to `true` on a public demo instance: the login page prints the shared demo credentials with a one-click sign-in, a permanent banner says the account is shared, the sign-in throttles are relaxed, and credential/account changes are refused (see below). Off by default, and while it is off the endpoint serving the credentials returns nothing |
 | `DEMO_USERNAME` | | Username published by `DEMO_MODE` (default: `demo`). Advertises an account; does not create one |
 | `DEMO_PASSWORD` | | Password published by `DEMO_MODE` (default: `demo1234`) |
-| `PARTIU_VERSION` | | The running version, shown in the UI and used for the update check. Normally set to the Docker image tag |
+| `MYTRIPS_VERSION` | | MyTrips distribution version, displayed in the UI and checked against this fork's GitHub releases |
+| `PARTIU_VERSION` | | Upstream compatibility/version variable, retained for existing installations |
 
 Which of these are set is visible at a glance in **Settings → Optional integrations** (admin only), along with what each one adds. It is also summarised in one line at INFO level on startup. Nothing here is required: every integration degrades a single feature rather than breaking the app.
 
@@ -287,12 +289,12 @@ All other settings (Gmail credentials, sync interval, SMTP server) are configure
 
 ### First-run setup
 
-On first visit, Partiu shows a setup page to create the admin account. After logging in, go to **Settings** to configure your Gmail address and App Password.
+On first visit, MyTrips shows a setup page to create the admin account. After logging in, go to **Settings** to configure your Gmail address and App Password.
 
 ### Gmail App Password (per user)
 
 1. Google Account → Security → 2-Step Verification → App passwords
-2. Create one for "Mail" + "Other (Partiu)"
+2. Create one for "Mail" + "Other (MyTrips)"
 3. Paste the 16-character key in Settings → Gmail Account
 
 ### Two-Factor Authentication
@@ -321,7 +323,7 @@ The same OpenStreetMap fallback also catches a CARTO blocked by an adblocker or 
 
 ### Immich integration (optional)
 
-[Immich](https://immich.app) is a self-hosted photo management platform. Partiu can automatically create an Immich album for each completed trip using photos taken during the trip's date range.
+[Immich](https://immich.app) is a self-hosted photo management platform. MyTrips can automatically create an Immich album for each completed trip using photos taken during the trip's date range.
 
 **Setup:**
 
@@ -339,7 +341,7 @@ The same OpenStreetMap fallback also catches a CARTO blocked by an adblocker or 
    | `album.update` | Update album contents |
    | `albumAsset.create` | Add photos to the album |
 
-3. In Partiu, go to **Settings → Immich** and enter:
+3. In MyTrips, go to **Settings → Immich** and enter:
    - **Immich URL** — base URL of your Immich instance (e.g. `https://photos.yourdomain.com`)
    - **API Key** — the key you created above
 4. Click **Test Connection** to verify — then **Save**
@@ -352,7 +354,7 @@ To recreate an album, delete it in Immich first — the button will revert to "C
 
 ### Inbound SMTP (email forwarding)
 
-Instead of — or in addition to — Gmail IMAP sync, you can forward emails directly to Partiu:
+Instead of — or in addition to — Gmail IMAP sync, you can forward emails directly to MyTrips:
 
 1. Enable the SMTP server in Settings (admin only) and choose a port (default `2525`)
 2. Point your domain's MX record to your server, or set up an email alias that forwards to `your-server:2525`
@@ -367,7 +369,7 @@ This is useful if you use a non-Gmail provider or want instant processing withou
 | `A mail.yourdomain.com` | Your server's public IP |
 | `MX yourdomain.com` | `mail.yourdomain.com` (priority 10) |
 
-Forward port `25` (or `2525`) on your router/firewall to the server running Partiu.
+Forward port `25` (or `2525`) on your router/firewall to the server running MyTrips.
 
 ---
 

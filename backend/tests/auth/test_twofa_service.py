@@ -96,6 +96,8 @@ class TestTwoFaSetupEnableDisable:
         result = service.setup_2fa(user)
         assert result.secret
         assert "otpauth://" in result.uri
+        assert "MyTrips" in result.uri
+        assert "Partiu" not in result.uri
 
     def test_setup_rejected_when_already_enabled(self, test_db):
         from backend.auth.twofa_service import AuthError, TwoFAService

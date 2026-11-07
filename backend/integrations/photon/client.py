@@ -150,7 +150,7 @@ def clear_cache() -> None:
 
 
 _HEADERS = {
-    "User-Agent": "Partiu/1.0 (self-hosted flight tracker; https://github.com/thiagodsti/partiu)"
+    "User-Agent": "MyTrips/0.1 (self-hosted travel planner; https://github.com/lurrnet/mytrips)"
 }
 
 
