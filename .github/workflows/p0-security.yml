@@ -24,7 +24,8 @@ jobs:
               assert "ghcr.io" not in s, "build/deploy must not depend on GHCR"
           for s in (root,oci):
               assert "image: mytrips:${MYTRIPS_VERSION:-0.1.0}" in s
-              assert '127.0.0.1:${PARTIU_PORT:-8000}:8000' in s
+              assert '127.0.0.1:${MYTRIPS_PORT:-8030}:8000' in s
+              assert "PARTIU_PORT" not in s
               assert "25:2525" not in s and "2525:2525" not in s
               assert 'DISABLE_SMTP_SERVER: "true"' in s
               assert 'DISABLE_SCHEDULER: "true"' in s
@@ -32,6 +33,9 @@ jobs:
               assert 'OLLAMA_URL: ""' in s
               assert 'DEMO_MODE: "false"' in s
               assert "DB_PATH: /app/data/mytrips.db" in s
+          env_example=Path(".env.example").read_text()
+          assert "MYTRIPS_PORT=8030" in env_example
+          assert "PARTIU_PORT" not in env_example
           assert not Path(".github/workflows/build.yml").exists()
           assert not Path(".github/workflows/p0-arm64-build.yml").exists()
           print("P0 local build, no registry publish: PASS")

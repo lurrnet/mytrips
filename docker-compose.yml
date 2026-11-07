@@ -9,7 +9,7 @@ services:
     restart: unless-stopped
     init: true
     ports:
-      - "127.0.0.1:${PARTIU_PORT:-8000}:8000"
+      - "127.0.0.1:${MYTRIPS_PORT:-8030}:8000"
     volumes:
       - ./data:/app/data
     env_file:

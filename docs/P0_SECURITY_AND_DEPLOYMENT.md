@@ -7,7 +7,7 @@ MyTrips version: `MYTRIPS_VERSION=0.1.0`; upstream feature-version variable: `PA
 ## Policy
 
 - **Build and run directly on OCI**, never publish MyTrips container images to a registry.
-- Use either `deploy/oci/compose.yaml` (ARM64) or root `docker-compose.yml`. Both use `build:`, a local `mytrips:0.1.0` image tag, and bind HTTP to localhost.
+- Use either `deploy/oci/compose.yaml` (ARM64) or root `docker-compose.yml`. Both use `build:`, a local `mytrips:0.1.0` image tag, and bind HTTP to `127.0.0.1:8030` by default. Set `MYTRIPS_PORT` in the root `.env` to override the host port; the container always listens on port 8000.
 - GitHub CI still runs tests and a local Docker build smoke check; it does not push images. Both image publishing workflows were removed.
 - The Dockerfile installs pinned `uv` from Python packages instead of copying binaries from GHCR.
 - `DISABLE_SMTP_SERVER=true` is enforced by the patched backend regardless of admin settings. No SMTP host port is published. Scheduler, LLM, and Photon lookups disabled in the OCI deployment.
@@ -31,11 +31,11 @@ mkdir -p data && chmod 700 data
 bash deploy/oci/check-config.sh
 docker compose --env-file .env -f deploy/oci/compose.yaml up -d --build
 docker compose --env-file .env -f deploy/oci/compose.yaml ps
-curl -fsS http://127.0.0.1:8000/manifest.json
+curl -fsS http://127.0.0.1:8030/manifest.json
 ```
 
-If port 8000 is occupied, add `PARTIU_PORT=8005` to `.env` and use `127.0.0.1:8005` in curl and Cloudflare Tunnel origin.
-Cloudflare Tunnel origin `http://127.0.0.1:<port>` assumes cloudflared runs **on the same host**. Protect it with Cloudflare Access.
+The setting is in the repository root `.env`, copied from `.env.example`: `MYTRIPS_PORT=8030`. If port 8030 is occupied, choose another unused host port by changing that value. `PARTIU_PORT` was an old, undocumented Compose-only variable; it is no longer supported. To update an existing `.env`, replace any `PARTIU_PORT=...` line with `MYTRIPS_PORT=8030`, or append the new line if neither exists. Docker still listens on port 8000 **inside the container**.
+Cloudflare Tunnel origin `http://127.0.0.1:8030` assumes cloudflared runs **on the same host**. Protect it with Cloudflare Access.
 Use synthetic data for the initial smoke test.
 
 ## Routine updates
