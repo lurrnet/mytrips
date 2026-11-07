@@ -122,16 +122,16 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Build image
-        run: docker build -t partiu:ci .
+        run: docker build -t mytrips:ci .
 
       - name: Smoke test (startup check)
         run: |
           docker run --rm -d \
             -e SECRET_KEY="ci-test-secret-key-placeholder-32x" \
             -e DISABLE_SCHEDULER="true" \
-            --name partiu_ci \
-            partiu:ci
+            --name mytrips_ci \
+            mytrips:ci
           sleep 5
-          docker logs partiu_ci
-          docker inspect partiu_ci --format='{{.State.Running}}' | grep true
-          docker stop partiu_ci
+          docker logs mytrips_ci
+          docker inspect mytrips_ci --format='{{.State.Running}}' | grep true
+          docker stop mytrips_ci

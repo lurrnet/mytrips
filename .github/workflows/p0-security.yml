@@ -27,6 +27,8 @@ jobs:
           assert "partiu-api-" not in service_worker
           print("MyTrips PWA branding: PASS")
           PY
+      - name: Full brand regression audit
+        run: python3 scripts/audit_branding.py
       - name: Check local-build deployment guardrails
         run: |
           python3 - <<'PY'

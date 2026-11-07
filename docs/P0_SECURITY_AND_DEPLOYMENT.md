@@ -87,3 +87,23 @@ Backups contain sensitive travel records; restrict and encrypt off-host copies.
 
 P1 will introduce Cloudflare Email Routing → Email Worker → authenticated MyTrips API. Until then, SMTP is deliberately disabled and manual entry / upload can be used.
 The existing Partiu update checker talks to GitHub (not GHCR); if avoiding this optional outbound lookup is also desired, it requires a separate setting/change.
+
+## Branding audit (MyTrips distribution)
+
+The customer-facing name is **MyTrips** in the setup/login flows, English and
+Portuguese translations, navigation and GitHub links, PWA manifest/HTML, default
+push notifications, 2FA authenticator issuer, API docs, iCalendar producer,
+integrations' User-Agent headers, frontend package metadata and release checker.
+
+Run `python3 scripts/audit_branding.py` to identify any regressed user-visible
+Partiu names. This audit runs in GitHub CI on every PR and main push.
+
+**Intentional compatibility exceptions:** upstream provenance links and demo URLs
+in README; `PARTIU_VERSION` upstream env fallback; legacy SQLite
+`partiu.db` migrations; `partiu-at-rest-v1` crypto KDF salt;
+`partiu.audit` internal logger; `@partiu` iCalendar UIDs (changing UIDs would
+duplicate events in existing calendars); `partiu-api-*` legacy CacheStorage
+purging; `partiu_push_enabled` legacy notification preference migration; and
+the Python project metadata `partiu` retained to avoid modifying the locked
+dependency graph. The first MyTrips rebuild invalidates PWA caches; if an
+existing installed PWA title remains stale after update, reinstall the PWA.
