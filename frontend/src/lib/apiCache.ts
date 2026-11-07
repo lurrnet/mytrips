@@ -15,14 +15,15 @@
  * and works even when no service worker is controlling the page (a fresh
  * install, or a browser that never registered one).
  */
-const API_CACHE_PREFIX = 'partiu-api-';
+// Keep legacy cache support to prevent cross-account data leakage after upgrade.
+const API_CACHE_PREFIXES = ['mytrips-api-', 'partiu-api-'];
 
 export async function purgeApiCache(): Promise<void> {
   if (typeof caches === 'undefined') return;
   try {
     const names = await caches.keys();
     await Promise.all(
-      names.filter((n) => n.startsWith(API_CACHE_PREFIX)).map((n) => caches.delete(n)),
+      names.filter((n) => API_CACHE_PREFIXES.some((prefix) => n.startsWith(prefix))).map((n) => caches.delete(n)),
     );
   } catch {
     // Never block signing in or out on a cache that would not clear: the worst

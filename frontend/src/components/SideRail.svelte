@@ -21,12 +21,12 @@
        third-party host and there is nothing for it to learn from the referrer. -->
   <a
     class="rail-mark"
-    href="https://github.com/thiagodsti/partiu"
+    href="https://github.com/lurrnet/mytrips"
     target="_blank"
     rel="noopener noreferrer"
     title={$t('nav.project')}
     aria-label={$t('nav.project')}
-  >P</a>
+  >M</a>
 
   {#each NAV_ITEMS as item (item.href)}
     <a

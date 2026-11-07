@@ -1328,7 +1328,7 @@
           </span>
           {#if versionInfo.update_available}
             <a
-              href="https://github.com/thiagodsti/partiu/releases/latest"
+              href="https://github.com/lurrnet/mytrips/releases"
               target="_blank"
               rel="noopener noreferrer"
               class="btn btn-primary btn-sm"

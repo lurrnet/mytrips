@@ -12,7 +12,17 @@ import { notificationsApi } from '../api/client';
 
 export type NotifStatus = 'unsupported' | 'denied' | 'default' | 'subscribed' | 'unsubscribed';
 
-const PUSH_ENABLED_KEY = 'partiu_push_enabled';
+const PUSH_ENABLED_KEY = 'mytrips_push_enabled';
+const LEGACY_PUSH_ENABLED_KEY = 'partiu_push_enabled';
+
+// Keep existing notification opt-in when upgrading from the upstream PWA.
+function hasStoredPushOptIn(): boolean {
+  if (localStorage.getItem(PUSH_ENABLED_KEY) === '1') return true;
+  if (localStorage.getItem(LEGACY_PUSH_ENABLED_KEY) !== '1') return false;
+  localStorage.setItem(PUSH_ENABLED_KEY, '1');
+  localStorage.removeItem(LEGACY_PUSH_ENABLED_KEY);
+  return true;
+}
 
 export function isSupported(): boolean {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
@@ -64,7 +74,10 @@ export async function subscribe(): Promise<boolean> {
   if (permission !== 'granted') return false;
 
   const ok = await doSubscribe();
-  if (ok) localStorage.setItem(PUSH_ENABLED_KEY, '1');
+  if (ok) {
+    localStorage.setItem(PUSH_ENABLED_KEY, '1');
+    localStorage.removeItem(LEGACY_PUSH_ENABLED_KEY);
+  }
   return ok;
 }
 
@@ -72,6 +85,7 @@ export async function unsubscribe(): Promise<boolean> {
   if (!isSupported()) return false;
 
   localStorage.removeItem(PUSH_ENABLED_KEY);
+  localStorage.removeItem(LEGACY_PUSH_ENABLED_KEY);
 
   const reg = await navigator.serviceWorker.ready;
   const subscription = await reg.pushManager.getSubscription();
@@ -89,7 +103,7 @@ export async function unsubscribe(): Promise<boolean> {
  */
 export async function restoreIfNeeded(): Promise<void> {
   if (!isSupported()) return;
-  if (localStorage.getItem(PUSH_ENABLED_KEY) !== '1') return;
+  if (!hasStoredPushOptIn()) return;
   if (Notification.permission !== 'granted') {
     // Permission was revoked — clear the flag so we stop trying
     localStorage.removeItem(PUSH_ENABLED_KEY);
