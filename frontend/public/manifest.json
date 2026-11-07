@@ -1,6 +1,6 @@
 {
-  "name": "Partiu",
-  "short_name": "Partiu",
+  "name": "MyTrips",
+  "short_name": "MyTrips",
   "description": "Your personal travel companion",
   "start_url": "/",
   "display": "standalone",
