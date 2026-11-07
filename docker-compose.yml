@@ -1,37 +1,33 @@
+# Self-hosted MyTrips: build locally. For OCI ARM64, prefer deploy/oci/compose.yaml.
+name: mytrips
 services:
   app:
-    image: ghcr.io/thiagodsti/partiu:${PARTIU_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mytrips:${MYTRIPS_VERSION:-0.1.0}
     restart: unless-stopped
+    init: true
     ports:
-      - "8000:8000"   # Web UI + API
-      - "25:2525"     # Inbound SMTP (standard port, maps to app's 2525)
+      - "127.0.0.1:${PARTIU_PORT:-8000}:8000"
     volumes:
-      - ./data:/app/data   # SQLite db + email cache persisted on host
+      - ./data:/app/data
     env_file:
       - .env
-
-  # ---------------------------------------------------------------------------
-  # Optional: LLM fallback for parsing emails from unknown airlines.
-  # To enable: uncomment this service AND set OLLAMA_URL=http://ollama:11434
-  # in your .env file. On first start, pull a model:
-  #   docker compose exec ollama ollama pull qwen2.5:1.5b
-  # ---------------------------------------------------------------------------
-  # ollama:
-  #   image: ollama/ollama
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ollama_models:/root/.ollama   # model files persist across restarts
-  #   # Uncomment below to expose the API on the host (useful for local testing)
-  #   # ports:
-  #   #   - "11434:11434"
-  #   # Uncomment below to enable NVIDIA GPU passthrough
-  #   # deploy:
-  #   #   resources:
-  #   #     reservations:
-  #   #       devices:
-  #   #         - driver: nvidia
-  #   #           count: all
-  #   #           capabilities: [gpu]
-
-# volumes:
-#   ollama_models:
+    environment:
+      DB_PATH: /app/data/partiu.db
+      DISABLE_SMTP_SERVER: "true"
+      DISABLE_SCHEDULER: "true"
+      PHOTON_URL: ""
+      OLLAMA_URL: ""
+      DEMO_MODE: "false"
+      SECURE_COOKIES: "true"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/manifest.json', timeout=5).close()"]
+      interval: 30s
+      timeout: 8s
+      retries: 4
+      start_period: 40s
