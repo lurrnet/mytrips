@@ -265,7 +265,7 @@ Open `https://your-domain` and complete the first-run setup to create your admin
 | Variable | Required | Description |
 |---|---|---|
 | `SECRET_KEY` | ✓ | Secret key for signing session cookies. Generate with `openssl rand -hex 32` |
-| `DB_PATH` | | Path to the SQLite database (default: `./data/partiu.db`) |
+| `DB_PATH` | | Path to the SQLite database (default: `./data/mytrips.db`) |
 | `DISABLE_SCHEDULER` | | Set to `true` to disable background email sync (useful for dev) |
 | `AVIATIONSTACK_API_KEY` | | Free API key for aircraft type lookup |
 | `CARTO_API_KEY` | | Key for the trip map's CARTO Voyager basemap tiles (see below). Unset, the map uses plain OpenStreetMap tiles |
@@ -432,7 +432,7 @@ uv run python -m backend.tools.corpus_report
 uv run python -m backend.tools.corpus_report --quiet --json data/corpus_rows.json
 ```
 
-Name resolution needs a populated `airports` table, so point `--db` at a real database (default `data/partiu.db`).
+Name resolution needs a populated `airports` table, so point `--db` at a real database (default `data/mytrips.db`).
 
 ### eval_eml_files — test models against .eml files
 

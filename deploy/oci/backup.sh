@@ -23,6 +23,7 @@ cleanup() {
 }
 trap cleanup EXIT
 if [[ -n "$was_running" ]]; then "${compose[@]}" stop app; fi
+[[ -f data/mytrips.db ]] || { echo "Missing data/mytrips.db; migrate existing database before backup" >&2; exit 1; }
 tar -czf "$tmp" -C "$root" data
 gzip -t "$tmp"
 mv -- "$tmp" "$archive"
