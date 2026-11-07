@@ -13,7 +13,7 @@ load_dotenv(_ROOT / ".env")
 
 
 class Settings:
-    DB_PATH: str = os.getenv("DB_PATH", str(_ROOT / "data" / "partiu.db"))
+    DB_PATH: str = os.getenv("DB_PATH", str(_ROOT / "data" / "mytrips.db"))
     DISABLE_SCHEDULER: bool = os.getenv("DISABLE_SCHEDULER", "false").lower() == "true"
     DISABLE_SMTP_SERVER: bool = os.getenv("DISABLE_SMTP_SERVER", "false").lower() == "true"
     AVIATIONSTACK_API_KEY: str = os.getenv("AVIATIONSTACK_API_KEY", "")

@@ -20,6 +20,20 @@ def get_db_path() -> str:
     return settings.DB_PATH
 
 
+def _ensure_legacy_db_is_not_silently_ignored() -> None:
+    """Never initialize an empty MyTrips DB beside an unmigrated Partiu DB."""
+    db_path = Path(get_db_path())
+    if db_path.name != "mytrips.db" or db_path.exists():
+        return
+    legacy = db_path.with_name("partiu.db")
+    if legacy.is_file():
+        raise RuntimeError(
+            f"Existing database {legacy} found while {db_path} does not exist. "
+            "Stop MyTrips and run 'python3 scripts/rename_sqlite_db.py' "
+            "to copy the database safely before restarting."
+        )
+
+
 def get_connection(db_path: str | None = None) -> sqlite3.Connection:
     """Open a SQLite connection with WAL mode and row_factory set."""
     path = db_path or get_db_path()
@@ -159,6 +173,7 @@ def init_database():
     """Run pending Alembic migrations then seed static data."""
     from .integrations.aircraft.repository import AircraftTypeRepository
 
+    _ensure_legacy_db_is_not_silently_ignored()
     logger.info("Initializing database at %s", get_db_path())
     _run_alembic_migrations()
     _encrypt_existing_credentials()
