@@ -14,7 +14,7 @@ assert app["build"].get("dockerfile")=="Dockerfile", "must build local Dockerfil
 ports=app.get("ports", [])
 assert len(ports)==1 and ports[0].get("host_ip")=="127.0.0.1" and int(ports[0]["target"])==8000, "HTTP must be localhost-only; SMTP not published"
 env=app["environment"]
-for k,v in {"DB_PATH":"/app/data/partiu.db", "DISABLE_SMTP_SERVER":"true", "DISABLE_SCHEDULER":"true", "DEMO_MODE":"false", "PHOTON_URL":"", "OLLAMA_URL":"", "SECURE_COOKIES":"true"}.items():
+for k,v in {"DB_PATH":"/app/data/mytrips.db", "DISABLE_SMTP_SERVER":"true", "DISABLE_SCHEDULER":"true", "DEMO_MODE":"false", "PHOTON_URL":"", "OLLAMA_URL":"", "SECURE_COOKIES":"true"}.items():
     assert env.get(k)==v, f"unsafe {k}"
 dockerfile=(root/"Dockerfile").read_text()
 assert "ghcr.io" not in dockerfile, "Dockerfile must not fetch builder from GHCR"

@@ -31,6 +31,7 @@ jobs:
               assert 'PHOTON_URL: ""' in s
               assert 'OLLAMA_URL: ""' in s
               assert 'DEMO_MODE: "false"' in s
+              assert "DB_PATH: /app/data/mytrips.db" in s
           assert not Path(".github/workflows/build.yml").exists()
           assert not Path(".github/workflows/p0-arm64-build.yml").exists()
           print("P0 local build, no registry publish: PASS")
@@ -51,7 +52,7 @@ jobs:
           mkdir -p data
           python3 - <<'PY'
           import sqlite3
-          with sqlite3.connect("data/partiu.db") as db:
+          with sqlite3.connect("data/mytrips.db") as db:
               db.execute("create table restore_fixture (value text not null)")
               db.execute("insert into restore_fixture (value) values ('original')")
           PY
@@ -67,7 +68,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import sqlite3
-          with sqlite3.connect("data/partiu.db") as db:
+          with sqlite3.connect("data/mytrips.db") as db:
               db.execute("update restore_fixture set value = 'changed'")
           PY
           archive="$(find "$PARTIU_BACKUP_DIR" -name 'mytrips-*.tar.gz' -print -quit)"
@@ -75,7 +76,7 @@ jobs:
           bash deploy/oci/restore.sh --apply "$archive"
           python3 - <<'PY'
           import sqlite3
-          with sqlite3.connect("data/partiu.db") as db:
+          with sqlite3.connect("data/mytrips.db") as db:
               assert db.execute("select value from restore_fixture").fetchone() == ("original",)
           print("P0 synthetic cold backup/restore PASS")
           PY

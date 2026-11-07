@@ -39,10 +39,14 @@ rollback() {
 }
 trap rollback EXIT
 tar -xzf "$archive" --no-same-owner -C "$root"
-[[ -f data/partiu.db ]] || { echo "SQLite DB missing" >&2; exit 1; }
+# Legacy backup archives are supported; copy DB consistently, preserving source.
+if [[ -f data/partiu.db && ! -e data/mytrips.db ]]; then
+ python3 scripts/rename_sqlite_db.py --data-dir data
+fi
+[[ -f data/mytrips.db ]] || { echo "SQLite DB missing" >&2; exit 1; }
 python3 - <<'PY'
 import sqlite3
-conn=sqlite3.connect("file:data/partiu.db?mode=ro",uri=True)
+conn=sqlite3.connect("file:data/mytrips.db?mode=ro",uri=True)
 try:
  if conn.execute("PRAGMA integrity_check").fetchone()[0]!="ok": raise SystemExit("SQLite integrity check FAILED")
 finally: conn.close()

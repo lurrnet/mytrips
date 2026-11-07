@@ -54,6 +54,28 @@ docker compose --env-file .env -f deploy/oci/compose.yaml up -d --build
 
 For reproducibility, note the Git commit SHA or tag deployed. Local image tag `mytrips:0.1.0` is overwritten on a rebuild; to retain rollback images tag them with a distinct name **before** rebuilding.
 
+## SQLite database filename migration
+
+The application and both Compose files now default to `mytrips.db`.
+Existing installs with `partiu.db` must migrate while the app is stopped.
+The original database is preserved. The migration uses SQLite's backup API,
+including committed changes in WAL, and refuses to overwrite a target.
+
+```sh
+cd ~/github/mytrips
+docker compose --env-file .env -f deploy/oci/compose.yaml stop app
+python3 scripts/rename_sqlite_db.py
+# Existing .env files are not changed by git pull:
+sed -i 's#^DB_PATH=./data/partiu.db$#DB_PATH=./data/mytrips.db#' .env
+bash deploy/oci/check-config.sh
+docker compose --env-file .env -f deploy/oci/compose.yaml up -d --build
+```
+
+If `data/mytrips.db` already exists alongside `data/partiu.db`, do not
+overwrite either; inspect both databases first. Never migrate while the
+old app is still writing. After smoke testing, separately archive the
+original `data/partiu.db` and its old auxiliary files.
+
 ## Backup and restore
 
 `PARTIU_BACKUP_DIR=/var/backups/mytrips bash deploy/oci/backup.sh` stops the container, archives SQLite and files, validates gzip, writes a SHA256 checksum, then restarts it.
