@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import struct
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,14 +32,45 @@ def audit() -> None:
     if manifest.get("name") != "MyTrips" or manifest.get("short_name") != "MyTrips":
         failures.append("PWA manifest name and short_name must both be MyTrips")
 
+    # Assert the approved app artwork reaches each public icon endpoint.
+    icons = {
+        "frontend/public/icon-192.png": 192,
+        "frontend/public/icon-512.png": 512,
+        "frontend/public/icon-maskable-512.png": 512,
+        "frontend/public/apple-touch-icon.png": 180,
+        "frontend/public/mytrips-brand.png": 64,
+        "frontend/public/mytrips-original-A.png": 393,
+    }
+    for rel, expected_size in icons.items():
+        raw = (ROOT / rel).read_bytes()
+        if not raw.startswith(bytes([137, 80, 78, 71, 13, 10, 26, 10])):
+            failures.append(f"{rel}: not a PNG")
+            continue
+        width, height = struct.unpack(">II", raw[16:24])
+        if (width, height) != (expected_size, expected_size):
+            failures.append(f"{rel}: expected {expected_size}x{expected_size}, got {width}x{height}")
+
+    ico_path = ROOT / "frontend/public/favicon.ico"
+    if ico_path.read_bytes()[:4] != bytes([0, 0, 1, 0]):
+        failures.append("favicon.ico has invalid ICO header")
+    if manifest["icons"][2]["src"] != "/icon-maskable-512.png?v=3":
+        failures.append("Maskable icon must use dedicated safe-zone artwork")
+    for name in ("SetupPage", "LoginPage"):
+        rel = f"frontend/src/pages/{name}.svelte"
+        if '/mytrips-brand.png?v=3' not in (ROOT / rel).read_text():
+            failures.append(f"{rel}: brand image missing")
+
     explicit = {
         "frontend/index.html": (
             "<title>MyTrips</title>",
             'name="apple-mobile-web-app-title" content="MyTrips"',
+            '/favicon.ico?v=3',
+            '/apple-touch-icon.png?v=3',
         ),
-        "frontend/sw.js": ("title: 'MyTrips'", "mytrips-static-", "mytrips-api-"),
+        "frontend/sw.js": ("title: 'MyTrips'", "mytrips-static-", "mytrips-api-", "const CACHE_VERSION = 'v23'"),
         "frontend/src/components/SideRail.svelte": (
             "https://github.com/lurrnet/mytrips",
+            '/mytrips-brand.png?v=3',
         ),
         "frontend/src/pages/SettingsPage.svelte": (
             "https://github.com/lurrnet/mytrips/releases",

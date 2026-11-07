@@ -83,13 +83,14 @@ describe('the project mark', () => {
     const mark = container.querySelector('.rail-mark') as HTMLAnchorElement;
 
     expect(mark.tagName).toBe('A');
+    expect(mark.querySelector('img')?.getAttribute('src')).toBe('/mytrips-brand.png?v=3');
     expect(mark.getAttribute('href')).toBe('https://github.com/lurrnet/mytrips');
     expect(mark.getAttribute('target')).toBe('_blank');
     // noreferrer as well as noopener: the target is a third-party host.
     expect(mark.getAttribute('rel')).toBe('noopener noreferrer');
   });
 
-  it('is labelled, since "M" says nothing to a screen reader', () => {
+  it('is labelled, since an icon alone says nothing to a screen reader', () => {
     const { container } = render(SideRail);
     expect(container.querySelector('.rail-mark')?.getAttribute('aria-label')).toBeTruthy();
   });
