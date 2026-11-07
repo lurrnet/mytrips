@@ -144,7 +144,7 @@
 
 <div class="auth-page">
   <div class="auth-card">
-    <div class="auth-logo">✈</div>
+    <div class="auth-logo"><img src="/mytrips-brand.png?v=3" alt="" width="64" height="64" /></div>
     <h1 class="auth-title">{$t('login.title')}</h1>
 
     {#if step === 'credentials'}
@@ -270,9 +270,16 @@
   }
 
   .auth-logo {
-    font-size: 2.5rem;
-    text-align: center;
+    display: flex;
+    justify-content: center;
     margin-bottom: var(--space-sm);
+  }
+
+  .auth-logo img {
+    display: block;
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
   }
 
   .auth-title {

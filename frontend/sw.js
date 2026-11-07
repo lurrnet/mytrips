@@ -12,7 +12,7 @@
  * Cross-origin requests are not handled at all — see the fetch listener.
  */
 
-const CACHE_VERSION = 'v22';
+const CACHE_VERSION = 'v23';
 const STATIC_CACHE = `mytrips-static-${CACHE_VERSION}`;
 const API_CACHE = `mytrips-api-${CACHE_VERSION}`;
 

@@ -26,7 +26,7 @@
     rel="noopener noreferrer"
     title={$t('nav.project')}
     aria-label={$t('nav.project')}
-  >M</a>
+  ><img src="/mytrips-brand.png?v=3" alt="" width="40" height="40" /></a>
 
   {#each NAV_ITEMS as item (item.href)}
     <a
