@@ -11,6 +11,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - name: Check PWA application branding
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("frontend/public/manifest.json").read_text())
+          assert manifest["name"] == manifest["short_name"] == "MyTrips"
+          html = Path("frontend/index.html").read_text()
+          assert '<title>MyTrips</title>' in html
+          assert 'name="apple-mobile-web-app-title" content="MyTrips"' in html
+          service_worker = Path("frontend/sw.js").read_text()
+          assert "title: 'MyTrips'" in service_worker
+          assert "partiu-static-" not in service_worker
+          assert "partiu-api-" not in service_worker
+          print("MyTrips PWA branding: PASS")
+          PY
       - name: Check local-build deployment guardrails
         run: |
           python3 - <<'PY'

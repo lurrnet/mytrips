@@ -1,5 +1,5 @@
 /**
- * Service Worker for Partiu PWA.
+ * Service Worker for MyTrips PWA.
  *
  * Strategies:
  *   - GET /api/auth/*      → network-first (session state must always be fresh)
@@ -12,9 +12,9 @@
  * Cross-origin requests are not handled at all — see the fetch listener.
  */
 
-const CACHE_VERSION = 'v21';
-const STATIC_CACHE = `partiu-static-${CACHE_VERSION}`;
-const API_CACHE = `partiu-api-${CACHE_VERSION}`;
+const CACHE_VERSION = 'v22';
+const STATIC_CACHE = `mytrips-static-${CACHE_VERSION}`;
+const API_CACHE = `mytrips-api-${CACHE_VERSION}`;
 
 const API_CACHE_MAX = 150;   // max cached GET /api/* responses
 const STATIC_CACHE_MAX = 80; // max cached static assets
@@ -200,7 +200,7 @@ self.addEventListener('push', (event) => {
   console.log('[SW] push event received', event.data ? 'with data' : 'no data');
   if (!event.data) return;
 
-  let payload = { title: 'Partiu', body: '', url: '/' };
+  let payload = { title: 'MyTrips', body: '', url: '/' };
   try {
     payload = { ...payload, ...event.data.json() };
   } catch {

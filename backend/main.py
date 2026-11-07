@@ -96,7 +96,7 @@ async def _migrate_images_to_webp() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info("Starting Partiu...")
+    logger.info("Starting MyTrips...")
     validate_secret_key()  # Fail loudly if SECRET_KEY is not configured
     init_database()
     from .airports.repository import AirportRepository
@@ -139,7 +139,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Partiu",
+    title="MyTrips",
     description="Personal flight tracker PWA",
     version="1.0.0",
     lifespan=lifespan,
