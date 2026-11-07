@@ -31,7 +31,7 @@ describe('purgeApiCache', () => {
     return purgeApiCache().then(() => {
       // Old versions too: an install that has not activated the new worker yet
       // still holds the previous account's answers.
-      expect(deleted.sort()).toEqual(['partiu-api-v20', 'partiu-api-v21', 'mytrips-api-v22']);
+      expect(deleted.sort()).toEqual(['partiu-api-v20', 'partiu-api-v21', 'mytrips-api-v22'].sort());
     });
   });
 
