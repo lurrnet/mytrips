@@ -29,6 +29,12 @@ def audit() -> None:
     failures: list[str] = []
 
     manifest = json.loads((ROOT / "frontend/public/manifest.json").read_text())
+    if manifest.get("id") != "/" or manifest.get("scope") != "/":
+        failures.append("PWA manifest must have explicit stable id and scope")
+    html = (ROOT / "frontend/index.html").read_text()
+    if 'href="/manifest.json?v=4" crossorigin="use-credentials"' not in html:
+        failures.append("PWA manifest must send Cloudflare Access credentials")
+
     if manifest.get("name") != "MyTrips" or manifest.get("short_name") != "MyTrips":
         failures.append("PWA manifest name and short_name must both be MyTrips")
 
@@ -67,7 +73,7 @@ def audit() -> None:
             '/favicon.ico?v=3',
             '/apple-touch-icon.png?v=3',
         ),
-        "frontend/sw.js": ("title: 'MyTrips'", "mytrips-static-", "mytrips-api-", "const CACHE_VERSION = 'v23'"),
+        "frontend/sw.js": ("title: 'MyTrips'", "mytrips-static-", "mytrips-api-", "const CACHE_VERSION = 'v24'"),
         "frontend/src/components/SideRail.svelte": (
             "https://github.com/lurrnet/mytrips",
             '/mytrips-brand.png?v=3',

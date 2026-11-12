@@ -217,10 +217,10 @@ if _FRONTEND_DIR.exists():
     def serve_manifest():
         manifest = _FRONTEND_DIR / "manifest.json"
         if manifest.exists():
-            return FileResponse(str(manifest))
+            return FileResponse(str(manifest), media_type="application/manifest+json", headers={"Cache-Control": "no-cache"})
         # Dev mode: manifest lives in public/, not in frontend root
         fallback = Path(__file__).parent.parent / "frontend" / "public" / "manifest.json"
-        return FileResponse(str(fallback))
+        return FileResponse(str(fallback), media_type="application/manifest+json", headers={"Cache-Control": "no-cache"})
 
     # Never let browsers cache the service worker script or the SPA shell:
     # both must be revalidated on every request so a new deploy is picked up
