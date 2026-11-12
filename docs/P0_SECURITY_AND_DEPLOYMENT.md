@@ -107,3 +107,47 @@ purging; `partiu_push_enabled` legacy notification preference migration; and
 the Python project metadata `partiu` retained to avoid modifying the locked
 dependency graph. The first MyTrips rebuild invalidates PWA caches; if an
 existing installed PWA title remains stale after update, reinstall the PWA.
+
+
+## Android PWA install: "This app cannot be installed"
+
+MyTrips is deployed behind Cloudflare Access. Chromium may fail to load a
+credential-protected manifest without `crossorigin="use-credentials"` even when
+the manifest is on the same origin. The frontend now includes this attribute;
+the Manifest has an explicit stable ID/scope, and its response uses
+`application/manifest+json` with no-cache headers. The service worker avoids
+caching installation metadata and icon URLs.
+
+**First verify the app itself, without changing Access security settings:**
+
+```sh
+cd ~/github/mytrips
+git pull --ff-only
+docker compose --env-file .env -f deploy/oci/compose.yaml up -d --build
+python3 scripts/check_pwa_install.py --origin http://127.0.0.1:8030
+```
+
+The script checks actual HTTP responses (not just source files): manifest link
+and cookie credentials, JSON Content-Type, app identity/scope, image MIME type,
+PNG dimensions and CRC integrity, and service worker JavaScript response.
+
+If the localhost checks pass but Android Chrome still reports it cannot install:
+
+1. Open MyTrips over **HTTPS** using the canonical Cloudflare Tunnel hostname
+   in a regular Chrome tab (not Incognito, not plain `http://192.168...`).
+2. Complete Cloudflare Access login on that **same origin and Chrome profile**.
+3. Reload, then try the Chrome three-dot install option again. If an older
+   MyTrips/Partiu PWA is installed, uninstall the existing app first.
+4. In Chrome desktop DevTools → **Application → Manifest**, inspect install
+   errors and inspect the `manifest.json?v=4` request under **Network**.
+   It must return **200**, `application/manifest+json`, **MyTrips JSON**
+   instead of Access HTML or a 302 redirect. Icon URLs must return **200
+   image/png**, not `text/html`. Service worker `/sw.js` must load as JS.
+5. If requests still land on the Access login/challenge page after signing in,
+   investigate the Access application session, cookie scope, or WAF rules.
+   Do **not** disable Cloudflare Access on the entire hostname just to install
+   a PWA. Installation as a browser shortcut is a temporary fallback.
+
+Chrome on Android can only install a full WebAPK when its installability checks
+pass. A valid manifest and local CI are insufficient to prove an authenticated
+Cloudflare edge request works from the real Android browser.

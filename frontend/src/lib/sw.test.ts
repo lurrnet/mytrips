@@ -56,7 +56,7 @@ function loadServiceWorker() {
 
   const caches = {
     open: async () => cache,
-    keys: async () => ['mytrips-api-v22'],
+    keys: async () => ['mytrips-api-v24'],
     delete: async () => true,
     match: async (req: Request) => cacheEntries.get(req.url),
   };

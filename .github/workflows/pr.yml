@@ -127,6 +127,7 @@ jobs:
       - name: Smoke test (startup check)
         run: |
           docker run --rm -d \
+            -p 127.0.0.1:8030:8000 \
             -e SECRET_KEY="ci-test-secret-key-placeholder-32x" \
             -e DISABLE_SCHEDULER="true" \
             --name mytrips_ci \
@@ -134,4 +135,5 @@ jobs:
           sleep 5
           docker logs mytrips_ci
           docker inspect mytrips_ci --format='{{.State.Running}}' | grep true
+          python3 scripts/check_pwa_install.py --origin http://127.0.0.1:8030
           docker stop mytrips_ci

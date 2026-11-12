@@ -12,7 +12,7 @@
  * Cross-origin requests are not handled at all — see the fetch listener.
  */
 
-const CACHE_VERSION = 'v23';
+const CACHE_VERSION = 'v24';
 const STATIC_CACHE = `mytrips-static-${CACHE_VERSION}`;
 const API_CACHE = `mytrips-api-${CACHE_VERSION}`;
 
@@ -51,6 +51,16 @@ self.addEventListener('fetch', (event) => {
   // blocked". Nothing cross-origin is cacheable here anyway: these are no-cors
   // requests, so the responses are opaque.
   if (url.origin !== self.location.origin) return;
+
+  // Android install metadata must never use a stale or accidentally cached
+  // Cloudflare Access sign-in page. The browser needs a fresh manifest and PNG.
+  const installAssetPaths = new Set([
+    '/manifest.json', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png',
+  ]);
+  if (installAssetPaths.has(url.pathname)) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   if (url.pathname.startsWith('/api/')) {
     // Mutations pass through unchanged, but any successful one invalidates the
