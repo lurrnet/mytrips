@@ -213,9 +213,9 @@ def _resolve_static_file(base: Path, full_path: str) -> Path | None:
 # Serve frontend static files if directory exists
 if _FRONTEND_DIR.exists():
 
-    # Public installation resources are served from one /pwa/* namespace.
-    # Both legacy URLs remain aliases so already-installed WebAPKs can update
-    # while users transition. The Access Bypass rule should target only /pwa/*.
+    # Only /pwa/* is public at the Cloudflare Access edge.
+    # The new root-scoped SW is served from /pwa/sw.js with an explicit
+    # Service-Worker-Allowed header; legacy root-level URLs are not aliased.
     _NO_CACHE_HEADERS = {"Cache-Control": "no-cache"}
     _WORKER_HEADERS = {"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"}
 
@@ -225,7 +225,6 @@ if _FRONTEND_DIR.exists():
             return built
         return Path(__file__).parent.parent / "frontend" / "public" / "pwa" / filename
 
-    @app.get("/manifest.json")
     @app.get("/pwa/manifest.json")
     def serve_manifest():
         return FileResponse(
@@ -234,7 +233,6 @@ if _FRONTEND_DIR.exists():
             headers=_NO_CACHE_HEADERS,
         )
 
-    @app.get("/sw.js")
     @app.get("/pwa/sw.js")
     def serve_sw():
         return FileResponse(
