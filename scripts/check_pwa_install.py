@@ -82,15 +82,19 @@ def validate_png(body, size):
     check(saw_image_data and saw_end, "PNG has no image data or end marker")
 
 
-def run(origin):
+def run(origin, install_page=False):
     origin = origin.rstrip("/") + "/"
     scheme = urlsplit(origin)
     check(scheme.scheme in ("http", "https") and scheme.netloc, "Invalid origin URL")
     check(scheme.scheme == "https" or scheme.hostname in ("127.0.0.1", "localhost", "::1"),
           "Android PWA installation requires HTTPS (except localhost)")
 
-    mime, html = download(origin)
-    check(mime == "text/html", f"Root returned {mime}, expected HTML")
+    page_url = urljoin(origin, "/pwa-install.html") if install_page else origin
+    mime, html = download(page_url)
+    check(mime == "text/html", f"Page returned {mime}, expected HTML")
+    if install_page:
+        check(b"<title>Install MyTrips</title>" in html,
+              "Public install page missing or SPA fallback served instead")
     parser = ManifestLinkParser()
     parser.feed(html.decode("utf-8", errors="replace"))
     check(len(parser.links) == 1, f"Expected exactly one manifest link, got {len(parser.links)}")
@@ -105,7 +109,8 @@ def run(origin):
     fallback_mime, fallback_body = download(fallback_url)
     check(fallback_mime == "image/png", "HTML fallback icon is not image/png")
     validate_png(fallback_body, 192)
-    print("PASS  HTML + public manifest link + 192px PNG fallback icon")
+    print("PASS  HTML + public manifest link + 192px PNG fallback icon" +
+          (" (public install page)" if install_page else ""))
 
     manifest_url = urljoin(origin, link.get("href", ""))
     mime, content = download(manifest_url)
@@ -160,7 +165,7 @@ def run(origin):
           f"Service worker returned {sw_mime}, expected JavaScript")
     check(b"addEventListener('fetch'" in sw, "Service worker fetch handler missing")
     print("PASS  Service worker HTTP response")
-    print("\nPASS  MyTrips PWA local installability resources are valid")
+    print("\nPASS  MyTrips PWA installability resources are valid")
     print("NOTE  Android installation can still be blocked by Cloudflare Access, old browser cache, or phone settings")
 
 
@@ -168,8 +173,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--origin", default="http://127.0.0.1:8030",
                         help="MyTrips origin (default: http://127.0.0.1:8030)")
+    parser.add_argument("--install-page", action="store_true",
+                        help="Check /pwa-install.html directly (for external Access-bypassed bootstrap)")
     args = parser.parse_args()
     try:
-        run(args.origin)
+        run(args.origin, args.install_page)
     except (ValueError, TypeError) as exc:
         parser.exit(1, f"FAIL  {exc}\n")
