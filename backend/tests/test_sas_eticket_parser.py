@@ -20,7 +20,12 @@ def dt(year, month, day, hour, minute) -> datetime:
 
 @pytest.fixture(scope="module")
 def sas_scandinavian_airlines_email():
-    return load_eml_as_email_message("sas_eticket_pdf_anonymized.eml")
+    # The yearless 12NOV PDF itinerary is expected to resolve to Nov 2026.
+    # Pin a synthetic reference date earlier in 2026 instead of relying on
+    # the test runner's current date. This avoids both 2025 and 2027 drift.
+    message = load_eml_as_email_message("sas_eticket_pdf_anonymized.eml")
+    message.date = datetime(2026, 1, 15, tzinfo=UTC)
+    return message
 
 
 @pytest.fixture(scope="module")

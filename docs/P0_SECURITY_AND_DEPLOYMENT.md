@@ -131,6 +131,7 @@ assets:
 | Path | Purpose |
 | --- | --- |
 | `/pwa/install.html` | Public installation entry (no trip data) |
+| `/pwa/install.js` | CSP-compatible external installer logic |
 | `/pwa/manifest.json` | App identity and install metadata |
 | `/pwa/icon-192.png` | Chrome install / fallback icon |
 | `/pwa/icon-512.png` | Optional full-resolution ordinary icon |
@@ -227,3 +228,18 @@ After deploying, allow the browser to load the new worker, then confirm that
 travel data requires a working network connection. This worker policy does
 not clear independent browser HTTP caches, server caches, or any data that
 other application code may persist outside Service Worker CacheStorage.
+
+## v1.1 PWA security and runtime gates
+
+The public install page uses external `/pwa/install.js`; the global
+`script-src 'self'` CSP remains strict. An explicit FastAPI allowlist serves
+only approved `/pwa/` files, rejects symlinks, and returns true HTTP 404 for
+unknown files instead of returning the SPA shell. Do not add secrets, documents,
+logs or new files to this directory without reviewing the Bypass exposure.
+
+A **required** GitHub CI Chromium job checks that the installer executes under
+CSP, the visible icon decodes, the Manifest/Icons/Worker diagnostics actually
+reach PASS, the root-scoped worker activates, and unknown files return 404.
+This browser check does not substitute for real Android WebAPK or iOS Safari
+device tests. `scripts/check_pwa_install.py --install-page` now also checks
+that the standalone installer JS is publicly served with the expected MIME.

@@ -49,8 +49,13 @@ def audit() -> None:
         failures.append("Public PWA install page must reference approved icon")
     if '<img class="logo" src="/pwa/icon-192.png?v=5"' not in install_page:
         failures.append("Public install page visible logo must use the public /pwa/ icon, not a protected legacy URL")
-    if "navigator.serviceWorker.register('/pwa/sw.js'" not in install_page:
-        failures.append("Public PWA install page must register the existing service worker")
+    if 'src="/pwa/install.js?v=1"' not in install_page:
+        failures.append("Public installer must load the CSP-safe external install.js")
+    install_js = (ROOT / "frontend/public/pwa/install.js").read_text()
+    if "navigator.serviceWorker.register('/pwa/sw.js'" not in install_js:
+        failures.append("Public installer script must register the existing service worker")
+    if "<script>" in install_page:
+        failures.append("Public installer must not contain CSP-blocked inline JavaScript")
 
     if manifest.get("name") != "MyTrips" or manifest.get("short_name") != "MyTrips":
         failures.append("PWA manifest name and short_name must both be MyTrips")

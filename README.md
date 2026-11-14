@@ -223,6 +223,12 @@ the page's Install button when available). You can also reach this page from
 WebAPK with a white-circle launcher icon and an empty Manifest URL. The dedicated
 public page has been verified to install with the correct icon and Manifest URL.
 
+**Runtime security:** The public install page loads external `/pwa/install.js` to
+work with `script-src 'self'` without `unsafe-inline`. A fail-closed FastAPI
+allowlist serves only approved `/pwa/*` files; missing or unapproved resources
+return HTTP 404 rather than a SPA page. Real Chromium tests verify CSP, artwork,
+worker root scope and those 404s as a required CI gate.
+
 **Cloudflare Access setup:** When the web app is protected by Access, add
 **one path-prefix Bypass** policy for `/pwa/*` (or the Access application's
 corresponding `/pwa/` path match). The directory contains only installation
