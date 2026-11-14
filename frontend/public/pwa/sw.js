@@ -1,0 +1,254 @@
+/**
+ * Service Worker for MyTrips PWA.
+ *
+ * Strategies:
+ *   - GET /api/auth/*      → network-first (session state must always be fresh)
+ *   - GET /api/*           → stale-while-revalidate (serve cache instantly, update in background)
+ *   - non-GET /api/*       → pass-through, wiping the API cache *before* answering, so the
+ *                            re-read that follows a mutation cannot be served a stale copy
+ *   - /assets/*            → cache-first (content-hashed filenames)
+ *   - everything else      → network-first (app shell, always get latest deploy)
+ *
+ * Cross-origin requests are not handled at all — see the fetch listener.
+ */
+
+const CACHE_VERSION = 'v24';
+const STATIC_CACHE = `mytrips-static-${CACHE_VERSION}`;
+const API_CACHE = `mytrips-api-${CACHE_VERSION}`;
+
+const API_CACHE_MAX = 150;   // max cached GET /api/* responses
+const STATIC_CACHE_MAX = 80; // max cached static assets
+
+const trimInProgress = new Set();
+
+// ---- Install: skip waiting immediately ----
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+
+// ---- Activate: clean up old caches ----
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys.filter((k) => k !== STATIC_CACHE && k !== API_CACHE)
+            .map((k) => caches.delete(k))
+      )
+    )
+  );
+  self.clients.claim();
+});
+
+// ---- Fetch: routing strategy ----
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Third-party requests — map tiles, above all — go straight to the network.
+  // The catch-all below is meant for the app shell, but it was matching on
+  // pathname alone and so swallowed basemap tiles too, answering a dropped one
+  // with a JSON 503. That turns a blip the browser would have retried into a
+  // hard image error, which is exactly what the map reads as "this basemap is
+  // blocked". Nothing cross-origin is cacheable here anyway: these are no-cors
+  // requests, so the responses are opaque.
+  if (url.origin !== self.location.origin) return;
+
+  // Android install metadata must never use a stale or accidentally cached
+  // Cloudflare Access sign-in page. The browser needs a fresh manifest and PNG.
+  const installAssetPaths = new Set([
+    '/manifest.json', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png',
+    '/pwa/manifest.json', '/pwa/icon-192.png', '/pwa/icon-512.png', '/pwa/icon-maskable-512.png', '/pwa/apple-touch-icon.png',
+  ]);
+  if (installAssetPaths.has(url.pathname)) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/')) {
+    // Mutations pass through unchanged, but any successful one invalidates the
+    // whole API cache — otherwise a GET right after a POST/PATCH/DELETE can be
+    // served stale-while-revalidate's "stale" copy from before the mutation.
+    //
+    // The purge is **awaited before the response is handed back**, not run in
+    // `waitUntil`. `waitUntil` only keeps the worker alive; it makes no promise
+    // about finishing before the next fetch, so the page's re-read could — and
+    // did — race it and win, serving the pre-mutation copy. Saving a budget
+    // showed the old figure until you navigated away and back, because the GET
+    // that followed the PUT beat the purge to the cache.
+    //
+    // Awaiting costs one local CacheStorage sweep on the mutation's path and
+    // buys a real ordering guarantee: by the time the page sees the mutation
+    // resolve, there is nothing stale left to serve it.
+    if (event.request.method !== 'GET') {
+      event.respondWith(
+        (async () => {
+          const response = await fetch(event.request);
+          if (response.ok) await purgeApiCache();
+          return response;
+        })()
+      );
+      return;
+    }
+
+    // Auth endpoints are always network-first so session state is never stale
+    if (url.pathname.startsWith('/api/auth/')) {
+      event.respondWith(networkFirst(event.request, API_CACHE));
+      return;
+    }
+
+    // All other GET API calls: serve stale immediately, revalidate in background
+    event.respondWith(staleWhileRevalidate(event.request, API_CACHE));
+    return;
+  }
+
+  // Hashed static assets (/assets/*): cache-first — filenames change on deploy
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(cacheFirst(event.request, STATIC_CACHE));
+    return;
+  }
+
+  // HTML / navigation: network-first so the app shell is always fresh after a deploy
+  event.respondWith(networkFirst(event.request, STATIC_CACHE));
+});
+
+// ---- Strategies ----
+
+async function cacheFirst(request, cacheName) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(cacheName);
+      await cache.put(request, response.clone());
+      try { await trimCache(cache, STATIC_CACHE_MAX); } catch (e) { console.warn('[SW] trimCache error', e); }
+    }
+    return response;
+  } catch {
+    return new Response('<h1>Offline</h1>', {
+      headers: { 'Content-Type': 'text/html' },
+    });
+  }
+}
+
+async function networkFirst(request, cacheName) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(cacheName);
+      await cache.put(request, response.clone());
+      try { await trimCache(cache, API_CACHE_MAX); } catch (e) { console.warn('[SW] trimCache error', e); }
+    }
+    return response;
+  } catch {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    return new Response(JSON.stringify({ error: 'Offline' }), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 503,
+    });
+  }
+}
+
+async function staleWhileRevalidate(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+
+  // Always kick off a background network fetch to keep the cache warm
+  const networkFetch = fetch(request)
+    .then(async (response) => {
+      if (response.ok) {
+        await cache.put(request, response.clone());
+        try { await trimCache(cache, API_CACHE_MAX); } catch (e) { console.warn('[SW] trimCache error', e); }
+      }
+      return response;
+    })
+    .catch(() => null);
+
+  // Return stale immediately if available; background fetch will update the cache
+  if (cached) return cached;
+
+  // No cached copy — must wait for the network
+  const response = await networkFetch;
+  if (response) return response;
+  return new Response(JSON.stringify({ error: 'Offline' }), {
+    headers: { 'Content-Type': 'application/json' },
+    status: 503,
+  });
+}
+
+async function purgeApiCache() {
+  try {
+    const cache = await caches.open(API_CACHE);
+    const keys = await cache.keys();
+    await Promise.all(keys.map((k) => cache.delete(k)));
+  } catch (e) {
+    console.warn('[SW] purgeApiCache failed', e);
+  }
+}
+
+// ---- Cache size management ----
+
+async function trimCache(cache, maxEntries) {
+  if (trimInProgress.has(cache)) return;
+  trimInProgress.add(cache);
+  try {
+    const keys = await cache.keys();
+    if (keys.length > maxEntries) {
+      // Cache API returns keys in insertion order; delete the oldest excess
+      const toDelete = keys.slice(0, keys.length - maxEntries);
+      await Promise.all(toDelete.map((k) => cache.delete(k)));
+    }
+  } catch (e) {
+    console.warn('[SW] trimCache failed', e);
+  } finally {
+    trimInProgress.delete(cache);
+  }
+}
+
+// ---- Push notifications ----
+self.addEventListener('push', (event) => {
+  console.log('[SW] push event received', event.data ? 'with data' : 'no data');
+  if (!event.data) return;
+
+  let payload = { title: 'MyTrips', body: '', url: '/' };
+  try {
+    payload = { ...payload, ...event.data.json() };
+  } catch {
+    payload.body = event.data.text();
+  }
+
+  console.log('[SW] showing notification:', payload.title);
+  const badgeCount = typeof payload.badge === 'number' ? payload.badge : undefined;
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: '/pwa/icon-192.png',
+      data: { url: payload.url },
+    }).then(() => {
+      console.log('[SW] notification shown OK');
+      if (badgeCount !== undefined && 'setAppBadge' in self.registration) {
+        return self.registration.setAppBadge(badgeCount);
+      }
+    }).catch((err) => {
+      console.error('[SW] showNotification failed:', err);
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.postMessage({ type: 'navigate', url });
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});
