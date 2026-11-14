@@ -7,7 +7,7 @@
  *   - HTML navigation             → network-first; cache only successful app-shell HTML
  *   - everything else             → browser network (not cached by this worker)
  *
- * On activation, erase old MyTrips/Partiu API caches, which may contain
+ * On activation, erase old pre-rebrand API caches, which may contain
  * private trip data from previous accounts. Cross-origin traffic is untouched.
  */
 

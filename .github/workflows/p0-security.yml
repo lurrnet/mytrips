@@ -16,16 +16,18 @@ jobs:
           python3 - <<'PY'
           import json
           from pathlib import Path
-          manifest = json.loads(Path("frontend/public/manifest.json").read_text())
+          manifest = json.loads(Path("frontend/public/pwa/manifest.json").read_text())
           assert manifest["name"] == manifest["short_name"] == "MyTrips"
           html = Path("frontend/index.html").read_text()
           assert '<title>MyTrips</title>' in html
           assert 'name="apple-mobile-web-app-title" content="MyTrips"' in html
-          service_worker = Path("frontend/sw.js").read_text()
+          service_worker = Path("frontend/public/pwa/sw.js").read_text()
           assert "title: 'MyTrips'" in service_worker
-          assert "partiu-static-" not in service_worker
-          assert "partiu-api-" not in service_worker
-          print("MyTrips PWA branding: PASS")
+          # The old CacheStorage prefixes intentionally remain so v25 can
+          # delete personal data left by historical installations.
+          assert "partiu-static-" in service_worker
+          assert "partiu-api-" in service_worker
+          print("MyTrips PWA branding and legacy cleanup: PASS")
           PY
       - name: Full brand regression audit
         run: python3 scripts/audit_branding.py

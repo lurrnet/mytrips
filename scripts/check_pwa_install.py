@@ -39,7 +39,7 @@ def check(condition, error):
         raise ValueError(error)
 
 
-def download(url):
+def download(url, include_headers=False):
     request = Request(url, headers={"User-Agent": "MyTrips-PWA-Install-Check/1.0"})
     try:
         with urlopen(request, timeout=12) as response:
@@ -48,11 +48,14 @@ def download(url):
             actual = response.geturl()
             check(urlsplit(actual).netloc == urlsplit(url).netloc,
                   "Redirected to another host (possibly Cloudflare Access login)")
-            return response.headers.get_content_type(), payload
+            result = (response.headers.get_content_type(), payload)
+            if include_headers:
+                return (*result, response.headers)
+            return result
     except HTTPError as exc:
-        raise ValueError(f"HTTP {exc.code}: possible missing file or Access policy") from exc
+        raise ValueError(f"{urlsplit(url).path}: HTTP {exc.code} (origin, tunnel or Access)") from exc
     except URLError as exc:
-        raise ValueError(f"Network error: {exc.reason}") from exc
+        raise ValueError(f"{urlsplit(url).path}: Network error: {exc.reason}") from exc
 
 
 def validate_png(body, size):
@@ -161,17 +164,13 @@ def run(origin, install_page=False):
           "Chromium requires both 192x192 and 512x512 regular icons")
     check(512 in maskable_sizes, "512x512 maskable icon is missing")
 
-    sw_mime, sw = download(urljoin(origin, "/pwa/sw.js"))
+    sw_mime, sw, sw_headers = download(urljoin(origin, "/pwa/sw.js"), include_headers=True)
     check(sw_mime in ("text/javascript", "application/javascript"),
           f"Service worker returned {sw_mime}, expected JavaScript")
     check(b"addEventListener('fetch'" in sw, "Service worker fetch handler missing")
-    # /pwa/sw.js must be authorized to control / (outside its default scope).
-    # Verify the canonical origin's response headers, not just the MIME.
-    request = Request(urljoin(origin, "/pwa/sw.js"), headers={"User-Agent": "MyTrips-PWA-Install-Check/1.0"})
-    with urlopen(request, timeout=12) as response:
-        check(response.geturl() == request.full_url, "Service worker redirected")
-        check(response.headers.get("Service-Worker-Allowed") == "/",
-              "Missing Service-Worker-Allowed: / for root-scope worker")
+    # The worker lives under /pwa/ but must control the application at /.
+    check(sw_headers.get("Service-Worker-Allowed") == "/",
+          "Missing Service-Worker-Allowed: / for root-scope worker")
     print("PASS  Service worker HTTP response + root scope header")
     if install_page:
         # All public resources must remain inside the single Bypass prefix.
