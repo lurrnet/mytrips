@@ -28,8 +28,8 @@ test('public installer executes under CSP with real visible artwork', async ({ p
   expect(image.source).toBe('/pwa/icon-192.png');
 
   const registration = await page.evaluate(async () => {
-    const worker = await navigator.serviceWorker.getRegistration('/');
-    return { scope: worker?.scope, scriptURL: worker?.active?.scriptURL };
+    const worker = await navigator.serviceWorker.ready;
+    return { scope: worker.scope, scriptURL: worker.active?.scriptURL };
   });
   expect(registration.scope).toBe('http://localhost:8000/');
   expect(registration.scriptURL).toBe('http://localhost:8000/pwa/sw.js');
