@@ -23,6 +23,7 @@ class ManifestLinkParser(HTMLParser):
         super().__init__()
         self.links = []
         self.icon_links = []
+        self.logo_images = []
 
     def handle_starttag(self, tag, attrs):
         values = dict(attrs)
@@ -32,6 +33,8 @@ class ManifestLinkParser(HTMLParser):
                 self.links.append(values)
             if "icon" in rels:
                 self.icon_links.append(values)
+        if tag == "img" and "logo" in values.get("class", "").split():
+            self.logo_images.append(values)
 
 
 def check(condition, error):
@@ -112,6 +115,14 @@ def run(origin, install_page=False):
     fallback_mime, fallback_body = download(fallback_url)
     check(fallback_mime == "image/png", "HTML fallback icon is not image/png")
     validate_png(fallback_body, 192)
+    if install_page:
+        check(len(parser.logo_images) == 1, "Install page must display exactly one logo image")
+        logo_url = urljoin(page_url, parser.logo_images[0].get("src", ""))
+        check(logo_url == fallback_url,
+              f"Visible install-page logo points to {urlsplit(logo_url).path}, "
+              f"but canonical public icon is {urlsplit(fallback_url).path}")
+        check(urlsplit(logo_url).path.startswith("/pwa/"), "Visible logo must be under /pwa/")
+        print("PASS  Visible install-page logo matches accessible public PNG icon")
     print("PASS  HTML + public manifest link + 192px PNG fallback icon" +
           (" (public install page)" if install_page else ""))
 

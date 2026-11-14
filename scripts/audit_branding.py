@@ -47,6 +47,8 @@ def audit() -> None:
         failures.append("Public PWA install page must link back to the protected app")
     if 'href="/pwa/icon-192.png?v=5"' not in install_page:
         failures.append("Public PWA install page must reference approved icon")
+    if '<img class="logo" src="/pwa/icon-192.png?v=5"' not in install_page:
+        failures.append("Public install page visible logo must use the public /pwa/ icon, not a protected legacy URL")
     if "navigator.serviceWorker.register('/pwa/sw.js'" not in install_page:
         failures.append("Public PWA install page must register the existing service worker")
 
