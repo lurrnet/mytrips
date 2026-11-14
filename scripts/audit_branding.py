@@ -36,6 +36,13 @@ def audit() -> None:
         failures.append("PWA manifest must be referenced without credentials (public Access bypass)")
     if 'rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=5"' not in html:
         failures.append("HTML must provide a 192px PNG fallback icon for Android")
+    install_page = (ROOT / "frontend/public/pwa-install.html").read_text()
+    if '<link rel="manifest" href="/manifest.json?v=6"' not in install_page:
+        failures.append("Public PWA install page must reference the canonical manifest")
+    if 'href="/icon-192.png?v=5"' not in install_page:
+        failures.append("Public PWA install page must reference approved icon")
+    if "navigator.serviceWorker.register('/sw.js'" not in install_page:
+        failures.append("Public PWA install page must register the existing service worker")
 
     if manifest.get("name") != "MyTrips" or manifest.get("short_name") != "MyTrips":
         failures.append("PWA manifest name and short_name must both be MyTrips")
