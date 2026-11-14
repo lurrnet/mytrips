@@ -99,24 +99,34 @@ def run(origin, install_page=False):
           "Android PWA installation requires HTTPS (except localhost)")
 
     page_url = urljoin(origin, "/pwa/install.html") if install_page else origin
-    mime, html = download(page_url)
+    mime, html, page_headers = download(page_url, include_headers=True)
     check(mime == "text/html", f"Page returned {mime}, expected HTML")
     if install_page:
         check(b"<title>Install MyTrips</title>" in html,
               "Public install page missing or SPA fallback served instead")
+        cache_directives = {item.strip().lower() for item in
+                            page_headers.get("Cache-Control", "").split(",")}
+        check("no-transform" in cache_directives,
+              "Public install page must send Cache-Control: no-transform "
+              "to prevent Cloudflare HTML script injection")
+        print("PASS  Installer HTML no-transform header (Cloudflare injection protection)")
     parser = ManifestLinkParser()
     parser.feed(html.decode("utf-8", errors="replace"))
     check(len(parser.links) == 1, f"Expected exactly one manifest link, got {len(parser.links)}")
     link = parser.links[0]
     if install_page:
-        check(len(parser.scripts) == 1 and parser.scripts[0].get("src") == "/pwa/install.js?v=1",
-              "Public installer must load one CSP-safe /pwa/install.js script")
+        scripts = [tag.get("src", "(inline)") for tag in parser.scripts]
+        check(scripts == ["/pwa/install.js?v=1"],
+              "Public installer must load exactly one CSP-safe script "
+              f"(observed: {scripts}); compare local HTML vs. Cloudflare and "
+              "check no-transform response header")
         js_mime, js = download(urljoin(page_url, parser.scripts[0]["src"]))
         check(js_mime in ("text/javascript", "application/javascript"),
               f"Installer JavaScript has invalid MIME: {js_mime}")
         check(b"navigator.serviceWorker.register('/pwa/sw.js'" in js,
               "External installer script does not register the canonical worker")
-        print("PASS  External installer JavaScript executes under same-origin CSP policy (HTTP check)")
+        print("PASS  External installer JavaScript reachable with valid MIME (HTTP check)")
+        print("NOTE  Browser CSP execution is verified by the separate Chromium CI gate")
     check("crossorigin" not in link,
           "Public manifest should use default credential-free fetch (remove crossorigin)")
     fallback_icons = [icon for icon in parser.icon_links
