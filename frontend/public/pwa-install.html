@@ -20,7 +20,12 @@
     p { color: #c4c4c6; font-size: 15px; line-height: 1.55; }
     .intro { text-align: center; margin: 0 0 24px; }
     .panel { border: 1px solid #383838; border-radius: 14px; padding: 18px; background: #18181a; }
-    .panel h2 { font-size: 16px; margin: 0 0 10px; }
+    .panel h2 { font-size: 17px; margin: 0 0 10px; }
+    .open-link { display: block; margin-top: 14px; border: 1px solid #53545a; padding: 12px; border-radius: 11px; text-align: center; text-decoration: none; font-weight: 600; }
+    details { margin-top: 20px; padding: 14px 18px; border: 1px solid #383838; border-radius: 14px; background: #18181a; }
+    summary { cursor: pointer; font-size: 14px; font-weight: 600; }
+    details .status { margin-top: 10px; }
+    [hidden] { display: none !important; }
     .status { font-size: 14px; line-height: 1.7; margin: 0; padding: 0; list-style: none; }
     .status li { overflow-wrap: anywhere; }
     .status .ok { color: #91d7a5; }
@@ -37,18 +42,23 @@
   <main>
     <img class="logo" src="/icon-192.png?v=5" width="112" height="112" alt="MyTrips app icon" />
     <h1>Install MyTrips</h1>
-    <p class="intro">Private travel organizer for your Android home screen.</p>
-    <section class="panel" aria-labelledby="status-heading">
-      <h2 id="status-heading">Installation resource check</h2>
-      <ul class="status">
+    <p class="intro">Your private travel companion, ready for your Android home screen.</p>
+    <section class="panel" aria-labelledby="install-heading">
+      <h2 id="install-heading">Install on Android</h2>
+      <p id="install-help" class="help">Open this page in <strong>Android Chrome</strong>, then use Chrome's <strong>three-dot menu → Install app</strong>. If an install button appears below, you can use that too.</p>
+      <button id="install-btn" type="button" hidden>Install MyTrips</button>
+      <a class="open-link" href="/">Open MyTrips</a>
+      <p class="help">Already installed? You don't need to reinstall. Open MyTrips from your home screen to sign in.</p>
+    </section>
+    <details>
+      <summary>Installation checks</summary>
+      <ul class="status" aria-live="polite">
         <li id="manifest-status" class="pending">Manifest: checking...</li>
         <li id="icon-status" class="pending">App icons: checking...</li>
         <li id="worker-status" class="pending">Service worker: checking...</li>
       </ul>
-      <button id="install-btn" type="button" disabled>Install MyTrips</button>
-      <p class="help">If the button remains disabled, use Chrome's <strong>three-dot menu → Install app</strong> while this page is open. Uninstall any existing MyTrips installation before testing.</p>
-    </section>
-    <p class="footer">This page contains no trip information. Your MyTrips application and API remain protected by Cloudflare Access. After installation, open the app to sign in.</p>
+    </details>
+    <p class="footer">This installation page contains no trip data. Your MyTrips application and API stay protected by Cloudflare Access.</p>
   </main>
   <script>
     (() => {
@@ -70,6 +80,7 @@
       window.addEventListener('beforeinstallprompt', (event) => {
         event.preventDefault();
         installPrompt = event;
+        button.hidden = false;
         button.disabled = false;
       });
       button.addEventListener('click', async () => {
@@ -79,7 +90,15 @@
         button.disabled = true;
         await prompt.prompt();
       });
-      window.addEventListener('appinstalled', () => { button.textContent = 'MyTrips installed'; button.disabled = true; });
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        document.getElementById('install-help').textContent =
+          'MyTrips is already open as an installed app. No installation is needed.';
+      }
+      window.addEventListener('appinstalled', () => {
+        button.hidden = true;
+        document.getElementById('install-help').textContent =
+          'MyTrips has been installed. Open it from your home screen.';
+      });
       (async () => {
         let manifest;
         try {

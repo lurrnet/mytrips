@@ -109,127 +109,80 @@ dependency graph. The first MyTrips rebuild invalidates PWA caches; if an
 existing installed PWA title remains stale after update, reinstall the PWA.
 
 
-## Android PWA install: "This app cannot be installed"
+## Android PWA installation
 
-MyTrips is deployed behind Cloudflare Access. Chrome may create a fallback
-WebAPK with a white-circle favicon, an empty `Manifest URL` and missing colors
-when the page does not adopt the web manifest. Only the static `/manifest.json`,
-`/icon-192.png` and `/icon-maskable-512.png` paths should have an explicit,
-narrowly scoped Cloudflare Access **Bypass** policy; `/` and `/api/*` must remain
-protected. Once the manifest is publicly accessible, the HTML links it without
-`crossorigin="use-credentials"`; Chrome can fetch it without Access cookies.
-The HTML also provides a high-resolution 192px PNG `rel=icon` as a fallback.
-The manifest retains an explicit stable ID/scope, is served as
-`application/manifest+json` with no-cache headers, and the service worker does
-not cache installation metadata or icons.
+**Confirmed Android installation path (2026-11-13):** When Chrome installed
+MyTrips from authenticated app routes such as `/#/login` or `/#/trips`, the
+Android WebAPK's `chrome://webapks` entry showed a blank `Manifest URL`, an
+incorrect start URL, and a white-circle launcher icon. Installing from the
+isolated public `/pwa-install.html` page on the **same hostname** correctly
+populated `Manifest URL` (`/manifest.json?v=6`) and displayed the approved
+MyTrips A icon. This strongly implicates the authenticated SPA install path;
+the specific root mechanism has not been isolated further.
 
-**First verify the app itself, without changing Access security settings:**
+### Cloudflare Access configuration
+
+Create narrowly scoped **path-exact Bypass** policies for these public static
+PWA resources under the *same hostname* as the private app:
+
+| Path | Purpose |
+| --- | --- |
+| `/pwa-install.html` | Public installation entry page, no trip data |
+| `/manifest.json` | Canonical app name, identity, colors, install icons |
+| `/icon-192.png` | Chrome install / fallback icon |
+| `/icon-maskable-512.png` | Android adaptive icon |
+| `/sw.js` | Install-page service worker registration |
+
+**Do not bypass `/`, `/api/*`, `/*`, `/assets/*`, or other private paths.**
+Keep the existing Cloudflare Access policy on all application data and pages.
+This strategy does not require exposing authentication cookies, the SPA, or API.
+
+For the current deployment these exact paths are available at
+`https://mytrips.skybluestudio.net`. For other installations replace the
+hostname with their own Cloudflare hostname. Static assets must return their
+real content (not a 302 Access login page).
+
+### Deploy and verify
 
 ```sh
 cd ~/github/mytrips
 git pull --ff-only
-docker compose --env-file .env -f deploy/oci/compose.yaml up -d --build
-python3 scripts/check_pwa_install.py --origin http://127.0.0.1:8030
-```
+docker compose --env-file .env -f deploy/oci/compose.yaml up -d --build --force-recreate app
 
-The script checks actual HTTP responses (not just source files): manifest link
-and cookie credentials, JSON Content-Type, app identity/scope, image MIME type,
-PNG dimensions and CRC integrity, and service worker JavaScript response.
-
-If the localhost checks pass but Android Chrome still reports it cannot install:
-
-1. Open MyTrips over **HTTPS** using the canonical Cloudflare Tunnel hostname
-   in a regular Chrome tab (not Incognito, not plain `http://192.168...`).
-2. Complete Cloudflare Access login on that **same origin and Chrome profile**.
-3. Reload, then try the Chrome three-dot install option again. If an older
-   MyTrips/Partiu PWA is installed, uninstall the existing app first.
-4. In Chrome desktop DevTools → **Application → Manifest**, inspect install
-   errors and inspect the `manifest.json?v=6` request under **Network**.
-   It must return **200**, `application/manifest+json`, **MyTrips JSON**
-   instead of Access HTML or a 302 redirect. Icon URLs must return **200
-   image/png**, not `text/html`. Service worker `/sw.js` must load as JS.
-5. If requests still land on the Access login/challenge page after signing in,
-   investigate the Access application session, cookie scope, or WAF rules.
-   Do **not** disable Cloudflare Access on the entire hostname just to install
-   a PWA. Installation as a browser shortcut is a temporary fallback.
-
-Chrome on Android can only install a full WebAPK when its installability checks
-pass. A valid manifest and local CI are insufficient to prove an authenticated
-Cloudflare edge request works from the real Android browser.
-
-
-## Android launcher icon — Smart Meter Texas comparison
-
-The working Smart Meter Texas PWA manifest uses 192px `purpose: any` and
-512px `purpose: any maskable`. MyTrips now follows that same unambiguous
-selection pattern while retaining the **approved original A artwork** and the
-dark, safe-zone-padded `icon-maskable-512.png`. The Web UI favicon and login
-artwork are unchanged. The previous 512px regular image remains available on
-disk, but is no longer a competing 512px manifest icon.
-
-After deploying, run `python3 scripts/check_pwa_install.py --origin http://127.0.0.1:8030`
-and check the external manifest in Chrome. An authenticated Access browser may
-fetch icons successfully while the **WebAPK minting service** still cannot
-create an Android-installed app; a fallback home-screen shortcut may render a
-small square icon in a white circle. This code change improves icon selection
-but **does not guarantee a WebAPK**.
-
-On Android Chrome open `chrome://webapks` and look for MyTrips. Also check
-Android Settings → Apps. A WebAPK appears as an installed app; a browser
-shortcut may only exist on the home screen. If MyTrips is not a WebAPK, diagnose
-Chrome installation eligibility and Cloudflare Access/minting compatibility,
-not icon colors. Keep Cloudflare Access enabled.
-
-
-### Android WebAPK missing Manifest URL (white-circle icon)
-
-When `chrome://webapks` shows `Manifest URL:` and `Theme color:` blank after a
-fresh install, treat the installation as a likely fallback / DIY WebAPK, even
-if it has an Android package name and standalone display. A correct local
-`check_pwa_install.py` run proves the OCI origin works, **not** that Chrome
-linked the authenticated web page to its manifest. Verify the exact
-`/manifest.json?v=6` response in the Android Chrome session or remote DevTools
-**Application → Manifest**; make sure the page has the `rel=manifest` link.
-The explicit PNG HTML icon makes the fallback sharper but cannot substitute
-for Chrome adopting the manifest. Keep Access on `/` and `/api/*`.
-
-
-### Public diagnostic installation page (Android Chrome)
-
-If freshly installed Android WebAPK entries still show a blank `Manifest URL`,
-a blank theme color, and a `Manifest Start URL` equal to the current
-`/#/trips` or `/#/login` page despite public PNG and manifest resources,
-use an isolated **static** installation page to diagnose adoption.
-
-The built frontend includes `/pwa-install.html`. To try this experiment,
-create a **path-exact** Cloudflare Access Bypass rule for
-`https://mytrips.skybluestudio.net/pwa-install.html`. Also allow
-`/sw.js` as a precise path if a clean, unauthenticated installation page
-needs to register the existing service worker. Both are static resources
-that must be reviewed before publication. Keep `/`, `/api/*`, and
-all travel data behind the existing Access application; do **not**
-bypass `/*`. The pre-existing icon/manifest bypass paths stay as-is.
-If the edge denies `/sw.js`, the diagnostic page will report worker failure.
-
-After rebuilding and applying the precise Bypass routes:
-
-```sh
+# After the container becomes healthy:
 python3 scripts/check_pwa_install.py --origin http://127.0.0.1:8030 --install-page
 python3 scripts/check_pwa_install.py --origin https://mytrips.skybluestudio.net --install-page
 ```
 
-The external install-page test verifies the HTML, manifest, icons and
-worker without cookies; it does not test the protected start URL, remote
-Chrome's manifest adoption, or whether the phone received a full install.
-Open `https://mytrips.skybluestudio.net/pwa-install.html` **in a normal
-Android Chrome tab**, uninstall the old MyTrips WebAPK from Android
-Settings first, and use Chrome's *Install app* option on that static page.
-Check `chrome://webapks`. If Manifest URL is now populated, the
-authenticated main page was interfering with manifest adoption; if it
-is still blank, inspect Android Chrome's manifest processing/errors
-before making additional image changes. Preserve the canonical manifest
-`id: "/"`, `start_url: "/"`, and `scope: "/"` throughout the test.
+The checks assert the live install page, manifest and icon PNGs, and service
+worker response. The external check requires the exact public Bypass paths.
+The application homepage itself must still redirect unauthenticated visitors
+to Cloudflare Access.
 
-This is a controlled diagnostic, not a guarantee that Chrome will use
-the manifest. A WebAPK can exist in Chrome's records even if Chrome
-installed using fallback metadata.
+### Install or reinstall on Android
+
+1. In regular **Android Chrome**, open the `/pwa-install.html` URL from the
+   site itself, or visit **Settings → Install MyTrips** and open the linked page
+   in Chrome. If the installed standalone app opens the link inside itself,
+   copy the URL into Chrome manually.
+2. Choose **Install app** in Chrome's three-dot menu. The page may offer its
+   own Install button when Chrome fires `beforeinstallprompt`.
+3. Launch the app from the home screen and authenticate through Cloudflare
+   Access / MyTrips as usual. Installing never grants access to private data.
+4. For troubleshooting, inspect `chrome://webapks`:
+   - `Manifest URL` must be nonempty and point to
+     `https://mytrips.skybluestudio.net/manifest.json?v=6`.
+   - `Manifest Start URL` must be the origin root `/`, not whichever
+     `/#/trips` or `/#/login` screen was open.
+   - Theme and background colors should be populated.
+
+Only uninstall an *old incorrectly installed* white-circle WebAPK if needed
+before a clean install. **Normal application updates should not require
+uninstalling MyTrips.** The existing Service Worker remains unchanged and
+checks for updates when the app is brought back into focus. The manifest has a
+stable `id: "/"`, `start_url: "/"`, and `scope: "/"` so future deployments
+keep the installed app identity and launch URL.
+
+If the public install page fails, compare the actual responses at the edge,
+check Chrome DevTools → Application → Manifest, and verify there are no
+unexpected redirects. Do not weaken the site's Access policy to fix an icon.
