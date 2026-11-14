@@ -28,24 +28,24 @@ LEGACY = {
 def audit() -> None:
     failures: list[str] = []
 
-    manifest = json.loads((ROOT / "frontend/public/manifest.json").read_text())
+    manifest = json.loads((ROOT / "frontend/public/pwa/manifest.json").read_text())
     if manifest.get("id") != "/" or manifest.get("scope") != "/":
         failures.append("PWA manifest must have explicit stable id and scope")
     html = (ROOT / "frontend/index.html").read_text()
-    if 'href="/manifest.json?v=6"' not in html or 'crossorigin="use-credentials"' in html:
+    if 'href="/pwa/manifest.json?v=7"' not in html or 'crossorigin="use-credentials"' in html:
         failures.append("PWA manifest must be referenced without credentials (public Access bypass)")
-    if 'rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=5"' not in html:
+    if 'rel="icon" type="image/png" sizes="192x192" href="/pwa/icon-192.png?v=5"' not in html:
         failures.append("HTML must provide a 192px PNG fallback icon for Android")
-    install_page = (ROOT / "frontend/public/pwa-install.html").read_text()
-    if '<link rel="manifest" href="/manifest.json?v=6"' not in install_page:
+    install_page = (ROOT / "frontend/public/pwa/install.html").read_text()
+    if '<link rel="manifest" href="/pwa/manifest.json?v=7"' not in install_page:
         failures.append("Public PWA install page must reference the canonical manifest")
-    if 'href="/pwa-install.html"' not in (ROOT / "frontend/src/pages/SettingsPage.svelte").read_text():
+    if 'href="/pwa/install.html"' not in (ROOT / "frontend/src/pages/SettingsPage.svelte").read_text():
         failures.append("Settings must link to the official public PWA install page")
     if '<a class="open-link" href="/">Open MyTrips</a>' not in install_page:
         failures.append("Public PWA install page must link back to the protected app")
-    if 'href="/icon-192.png?v=5"' not in install_page:
+    if 'href="/pwa/icon-192.png?v=5"' not in install_page:
         failures.append("Public PWA install page must reference approved icon")
-    if "navigator.serviceWorker.register('/sw.js'" not in install_page:
+    if "navigator.serviceWorker.register('/pwa/sw.js'" not in install_page:
         failures.append("Public PWA install page must register the existing service worker")
 
     if manifest.get("name") != "MyTrips" or manifest.get("short_name") != "MyTrips":
@@ -69,14 +69,18 @@ def audit() -> None:
         if (width, height) != (expected_size, expected_size):
             failures.append(f"{rel}: expected {expected_size}x{expected_size}, got {width}x{height}")
 
+    # All installer resources must live under the single public path.
+    for filename in ("manifest.json", "install.html", "sw.js"):
+        if not (ROOT / "frontend/public/pwa" / filename).is_file():
+            failures.append(f"Missing consolidated PWA resource: {filename}")
     ico_path = ROOT / "frontend/public/favicon.ico"
     if ico_path.read_bytes()[:4] != bytes([0, 0, 1, 0]):
         failures.append("favicon.ico has invalid ICO header")
     # Mirror the proven Smart Meter Texas Android manifest selection: one
     # 192px ordinary icon, one 512px image usable as BOTH any and maskable.
     expected_icon_purposes = {
-        ("192x192", "any", "/icon-192.png?v=5"),
-        ("512x512", "any maskable", "/icon-maskable-512.png?v=5"),
+        ("192x192", "any", "/pwa/icon-192.png?v=5"),
+        ("512x512", "any maskable", "/pwa/icon-maskable-512.png?v=5"),
     }
     actual_icon_purposes = {
         (icon.get("sizes"), icon.get("purpose", "any"), icon.get("src"))
@@ -96,7 +100,7 @@ def audit() -> None:
             '/favicon.ico?v=3',
             '/apple-touch-icon.png?v=3',
         ),
-        "frontend/sw.js": ("title: 'MyTrips'", "mytrips-static-", "mytrips-api-", "const CACHE_VERSION = 'v24'"),
+        "frontend/public/pwa/sw.js": ("title: 'MyTrips'", "mytrips-static-", "mytrips-api-", "const CACHE_VERSION = 'v24'"),
         "frontend/src/components/SideRail.svelte": (
             "https://github.com/lurrnet/mytrips",
             '/mytrips-brand.png?v=3',
@@ -140,7 +144,7 @@ def audit() -> None:
     scan = list((ROOT / "frontend/src").rglob("*")) + list(
         (ROOT / "backend").rglob("*.py")
     )
-    scan.extend((ROOT / "frontend/sw.js", ROOT / "frontend/index.html"))
+    scan.extend((ROOT / "frontend/public/pwa/sw.js", ROOT / "frontend/index.html"))
     for path in scan:
         if not path.is_file():
             continue
