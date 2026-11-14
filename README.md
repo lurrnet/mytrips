@@ -179,7 +179,7 @@ The original Partiu project maintains a public demo (not operated by MyTrips) at
   - **the doors that would lock everyone out are refused in the backend**, not just hidden in the UI: enabling 2FA, changing the password, and creating, editing or deleting accounts all return 403. Disabling 2FA stays allowed, as the escape hatch
   - run the demo account as a **non-admin** if you can — admin pages expose sync, SMTP and VAPID settings a visitor can still misconfigure
 
-- Signing in or out clears the app's cached API responses, so two people sharing a phone never see each other's trips or statistics
+- All `/api/*` requests are network-only in the PWA Service Worker; no trip, account, or authentication API responses are stored in its CacheStorage. On upgrade and at login/logout, legacy API caches are purged to prevent stale cross-account data on shared devices.
 ### Multi-user & admin
 - Multi-user support with per-user Gmail/IMAP credentials
 - Admin: create, list, update, reset passwords, delete users
@@ -210,8 +210,10 @@ The original Partiu project maintains a public demo (not operated by MyTrips) at
 
 ### PWA
 
-MyTrips supports installation on Android and iOS. It provides an offline-capable
-shell and responsive layouts; live trip data requires a connection.
+MyTrips supports installation on Android and iOS. It caches only non-sensitive
+static assets and the app shell; **all personal travel and account API data is
+network-only** and unavailable offline. This intentionally favors privacy over
+offline access to stored trip details.
 
 **Android Chrome (recommended):** Open `https://YOUR-MYTRIPS-HOST/pwa/install.html`
 directly in **Chrome** and choose **Install app** from the browser menu (or use

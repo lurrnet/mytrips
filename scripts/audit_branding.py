@@ -103,7 +103,7 @@ def audit() -> None:
             '/favicon.ico?v=3',
             '/apple-touch-icon.png?v=3',
         ),
-        "frontend/public/pwa/sw.js": ("title: 'MyTrips'", "mytrips-static-", "mytrips-api-", "const CACHE_VERSION = 'v24'"),
+        "frontend/public/pwa/sw.js": ("title: 'MyTrips'", "mytrips-static-", "mytrips-api-", "partiu-api-", "const CACHE_VERSION = 'v25'"),
         "frontend/src/components/SideRail.svelte": (
             "https://github.com/lurrnet/mytrips",
             '/mytrips-brand.png?v=3',
