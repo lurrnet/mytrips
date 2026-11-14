@@ -24,6 +24,11 @@ def test_public_pwa_directory_allows_only_reviewed_static_files():
             assert response.status_code == 200, (name, response.text[:150])
             assert response.headers["content-type"].startswith(mime)
         assert client.get("/pwa/sw.js").headers["service-worker-allowed"] == "/"
+        installer = client.get("/pwa/install.html")
+        assert installer.headers["cache-control"] == "no-store, no-transform"
+        assert "script-src 'self'" in installer.headers["content-security-policy"]
+        assert "unsafe-inline" not in installer.headers["content-security-policy"]
+        assert "no-transform" not in client.get("/pwa/manifest.json").headers["cache-control"]
 
 
 def test_public_pwa_directory_unknown_paths_return_real_404_not_spa_html():
