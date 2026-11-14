@@ -1599,6 +1599,27 @@
       {/if}
     </div>
 
+    <!-- Public install page is the confirmed Android entry point. Do not
+         install from the authenticated SPA, where Chrome can miss the manifest. -->
+    <div class="settings-section">
+      <div class="settings-section-title">{$t("settings.pwa_install_title")}</div>
+      <p class="form-hint" style="margin-bottom:var(--space-md)">
+        {$t("settings.pwa_install_desc")}
+      </p>
+      <a
+        href="/pwa-install.html"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="btn btn-secondary btn-full"
+        style="display:block;text-align:center"
+      >
+        {$t("settings.pwa_install_button")}
+      </a>
+      <p class="form-hint" style="margin-top:var(--space-sm)">
+        {$t("settings.pwa_install_hint")}
+      </p>
+    </div>
+
     <!-- Appearance -->
     <div class="settings-section">
       <div class="settings-section-title">{$t("settings.appearance")}</div>
