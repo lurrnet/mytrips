@@ -32,7 +32,7 @@ def audit() -> None:
     if manifest.get("id") != "/" or manifest.get("scope") != "/":
         failures.append("PWA manifest must have explicit stable id and scope")
     html = (ROOT / "frontend/index.html").read_text()
-    if 'href="/manifest.json?v=4" crossorigin="use-credentials"' not in html:
+    if 'href="/manifest.json?v=5" crossorigin="use-credentials"' not in html:
         failures.append("PWA manifest must send Cloudflare Access credentials")
 
     if manifest.get("name") != "MyTrips" or manifest.get("short_name") != "MyTrips":
@@ -59,8 +59,18 @@ def audit() -> None:
     ico_path = ROOT / "frontend/public/favicon.ico"
     if ico_path.read_bytes()[:4] != bytes([0, 0, 1, 0]):
         failures.append("favicon.ico has invalid ICO header")
-    if manifest["icons"][2]["src"] != "/icon-maskable-512.png?v=3":
-        failures.append("Maskable icon must use dedicated safe-zone artwork")
+    # Mirror the proven Smart Meter Texas Android manifest selection: one
+    # 192px ordinary icon, one 512px image usable as BOTH any and maskable.
+    expected_icon_purposes = {
+        ("192x192", "any", "/icon-192.png?v=5"),
+        ("512x512", "any maskable", "/icon-maskable-512.png?v=5"),
+    }
+    actual_icon_purposes = {
+        (icon.get("sizes"), icon.get("purpose", "any"), icon.get("src"))
+        for icon in manifest.get("icons", [])
+    }
+    if actual_icon_purposes != expected_icon_purposes:
+        failures.append("PWA icons must follow the Smart Meter Texas any/maskable pattern")
     for name in ("SetupPage", "LoginPage"):
         rel = f"frontend/src/pages/{name}.svelte"
         if '/mytrips-brand.png?v=3' not in (ROOT / rel).read_text():

@@ -115,7 +115,7 @@ def run(origin):
     print("PASS  Manifest JSON, identity, scope, display mode")
 
     any_sizes = set()
-    maskable = False
+    maskable_sizes = set()
     for i, icon in enumerate(manifest.get("icons", [])):
         sizes = icon.get("sizes", "").split()
         check(len(sizes) == 1 and "x" in sizes[0], f"Icon {i}: invalid sizes")
@@ -128,14 +128,19 @@ def run(origin):
         icon_mime, blob = download(icon_url)
         check(icon_mime == "image/png", f"Icon {i} returned {icon_mime}, expected image/png")
         validate_png(blob, width)
-        if "maskable" in icon.get("purpose", "any").split():
-            maskable = True
-        else:
+        # A manifest icon can advertise both purposes; it counts for both.
+        # Smart Meter Texas uses "any maskable" on its primary 512px icon.
+        purposes = set(icon.get("purpose", "any").split())
+        check(bool(purposes) and purposes.issubset({"any", "maskable", "monochrome"}),
+              f"Icon {i}: invalid purpose")
+        if "any" in purposes:
             any_sizes.add(width)
+        if "maskable" in purposes:
+            maskable_sizes.add(width)
         print(f"PASS  Icon {width}x{height}: image/png, valid PNG chunks")
     check(192 in any_sizes and 512 in any_sizes,
           "Chromium requires both 192x192 and 512x512 regular icons")
-    check(maskable, "Dedicated maskable icon is missing")
+    check(512 in maskable_sizes, "512x512 maskable icon is missing")
 
     sw_mime, sw = download(urljoin(origin, "/sw.js"))
     check(sw_mime in ("text/javascript", "application/javascript"),
