@@ -9,8 +9,15 @@ import backend.main as main
 
 
 class TestStaticCacheHeaders:
-    def test_sw_js_is_not_cached(self):
+    def test_sw_js_is_not_cached_and_allows_root_scope(self):
         response = main.serve_sw()
+        assert response.headers.get("cache-control") == "no-cache"
+        assert response.headers.get("service-worker-allowed") == "/"
+
+    def test_manifest_uses_canonical_pwa_file(self):
+        response = main.serve_manifest()
+        assert response.path.endswith("/pwa/manifest.json")
+        assert response.headers.get("content-type") == "application/manifest+json"
         assert response.headers.get("cache-control") == "no-cache"
 
     def test_spa_shell_is_not_cached(self):

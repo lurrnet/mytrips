@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#0c0c0d" />
   <meta name="description" content="Install the private MyTrips travel companion on Android." />
   <meta name="mobile-web-app-capable" content="yes" />
-  <link rel="manifest" href="/manifest.json?v=6" />
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=5" />
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
+  <link rel="manifest" href="/pwa/manifest.json?v=7" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/pwa/icon-192.png?v=5" />
+  <link rel="apple-touch-icon" href="/pwa/apple-touch-icon.png?v=3" />
   <title>Install MyTrips</title>
   <style>
     :root { color-scheme: dark; font-family: system-ui, -apple-system, sans-serif; background: #0c0c0d; color: #f6f6f5; }
@@ -102,7 +102,7 @@
       (async () => {
         let manifest;
         try {
-          const response = await checkResource('/manifest.json?v=6', 'application/manifest+json');
+          const response = await checkResource('/pwa/manifest.json?v=7', 'application/manifest+json');
           manifest = await response.json();
           if (manifest.name !== 'MyTrips' || manifest.id !== '/' || manifest.start_url !== '/' || !Array.isArray(manifest.icons)) {
             throw new Error('Unexpected manifest fields');
@@ -124,7 +124,7 @@
           if (!window.isSecureContext || !('serviceWorker' in navigator)) {
             throw new Error('Secure context/service worker not available');
           }
-          const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' });
+          const registration = await navigator.serviceWorker.register('/pwa/sw.js', { scope: '/', updateViaCache: 'none' });
           if (registration.scope !== new URL('/', location.href).href) {
             throw new Error('Unexpected worker scope: ' + registration.scope);
           }

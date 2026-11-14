@@ -56,6 +56,7 @@ self.addEventListener('fetch', (event) => {
   // Cloudflare Access sign-in page. The browser needs a fresh manifest and PNG.
   const installAssetPaths = new Set([
     '/manifest.json', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png',
+    '/pwa/manifest.json', '/pwa/icon-192.png', '/pwa/icon-512.png', '/pwa/icon-maskable-512.png', '/pwa/apple-touch-icon.png',
   ]);
   if (installAssetPaths.has(url.pathname)) {
     event.respondWith(fetch(event.request));
@@ -222,7 +223,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
-      icon: '/icon-192.png',
+      icon: '/pwa/icon-192.png',
       data: { url: payload.url },
     }).then(() => {
       console.log('[SW] notification shown OK');

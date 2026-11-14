@@ -1607,7 +1607,7 @@
         {$t("settings.pwa_install_desc")}
       </p>
       <a
-        href="/pwa-install.html"
+        href="/pwa/install.html"
         target="_blank"
         rel="noopener noreferrer"
         class="btn btn-secondary btn-full"

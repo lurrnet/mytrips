@@ -213,7 +213,7 @@ The original Partiu project maintains a public demo (not operated by MyTrips) at
 MyTrips supports installation on Android and iOS. It provides an offline-capable
 shell and responsive layouts; live trip data requires a connection.
 
-**Android Chrome (recommended):** Open `https://YOUR-MYTRIPS-HOST/pwa-install.html`
+**Android Chrome (recommended):** Open `https://YOUR-MYTRIPS-HOST/pwa/install.html`
 directly in **Chrome** and choose **Install app** from the browser menu (or use
 the page's Install button when available). You can also reach this page from
 **Settings → Install MyTrips**. Do **not** initiate installation from a signed-in
@@ -222,10 +222,12 @@ WebAPK with a white-circle launcher icon and an empty Manifest URL. The dedicate
 public page has been verified to install with the correct icon and Manifest URL.
 
 **Cloudflare Access setup:** When the web app is protected by Access, add
-**exact-path Bypass** rules for `/pwa-install.html`, `/manifest.json`,
-`/icon-192.png`, `/icon-maskable-512.png`, and `/sw.js`. These resources
-are static and contain no trip information. Keep `/`, `/api/*`, and all other
-application paths protected. Never bypass `/*` for PWA installation. See
+**one path-prefix Bypass** policy for `/pwa/*` (or the Access application's
+corresponding `/pwa/` path match). The directory contains only installation
+HTML, the canonical manifest, PNG assets, and the Service Worker. Keep `/`,
+`/api/*`, and all other application paths protected. Never bypass `/*` for
+PWA installation. The Service Worker at `/pwa/sw.js` is explicitly allowed
+to control the root application scope using `Service-Worker-Allowed: /`. See
 [OCI deployment and PWA setup](docs/P0_SECURITY_AND_DEPLOYMENT.md#android-pwa-installation).
 
 **iPhone/iPad:** In Safari use **Share → Add to Home Screen**. The standalone

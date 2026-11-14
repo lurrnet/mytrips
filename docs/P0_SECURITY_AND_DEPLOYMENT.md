@@ -31,7 +31,7 @@ mkdir -p data && chmod 700 data
 bash deploy/oci/check-config.sh
 docker compose --env-file .env -f deploy/oci/compose.yaml up -d --build
 docker compose --env-file .env -f deploy/oci/compose.yaml ps
-curl -fsS http://127.0.0.1:8030/manifest.json
+curl -fsS http://127.0.0.1:8030/pwa/manifest.json
 ```
 
 The setting is in the repository root `.env`, copied from `.env.example`: `MYTRIPS_PORT=8030`. If port 8030 is occupied, choose another unused host port by changing that value. `PARTIU_PORT` was an old, undocumented Compose-only variable; it is no longer supported. To update an existing `.env`, replace any `PARTIU_PORT=...` line with `MYTRIPS_PORT=8030`, or append the new line if neither exists. Docker still listens on port 8000 **inside the container**.
@@ -111,27 +111,32 @@ existing installed PWA title remains stale after update, reinstall the PWA.
 
 ## Android PWA installation
 
-**Confirmed Android installation path (2026-11-13):** When Chrome installed
-MyTrips from authenticated app routes such as `/#/login` or `/#/trips`, the
-Android WebAPK's `chrome://webapks` entry showed a blank `Manifest URL`, an
-incorrect start URL, and a white-circle launcher icon. Installing from the
-isolated public `/pwa-install.html` page on the **same hostname** correctly
-populated `Manifest URL` (`/manifest.json?v=6`) and displayed the approved
-MyTrips A icon. This strongly implicates the authenticated SPA install path;
-the specific root mechanism has not been isolated further.
+**Confirmed Android installation pattern (2026-11-13):** Chrome installed
+MyTrips successfully when opened from an isolated public installation page,
+whereas installation from authenticated SPA routes could create a fallback
+white-circle WebAPK with no manifest metadata. The public installer and its
+metadata now live together under `/pwa/`. This new prefix must be tested after
+deployment; the original device acceptance test was performed before the move.
+The app's manifest identity, start URL, and scope remain `/` so the installed
+app launches the protected web UI. Users may uninstall the old WebAPK and
+reinstall from the new URL; this migration does not maintain legacy PWA URLs.
 
 ### Cloudflare Access configuration
 
-Create narrowly scoped **path-exact Bypass** policies for these public static
-PWA resources under the *same hostname* as the private app:
+Create **one** path-prefix Cloudflare Access Bypass for
+`https://mytrips.skybluestudio.net/pwa/*` (adjust hostname for other
+deployments). The only contents under `frontend/public/pwa/` are installation
+assets:
 
 | Path | Purpose |
 | --- | --- |
-| `/pwa-install.html` | Public installation entry page, no trip data |
-| `/manifest.json` | Canonical app name, identity, colors, install icons |
-| `/icon-192.png` | Chrome install / fallback icon |
-| `/icon-maskable-512.png` | Android adaptive icon |
-| `/sw.js` | Install-page service worker registration |
+| `/pwa/install.html` | Public installation entry (no trip data) |
+| `/pwa/manifest.json` | App identity and install metadata |
+| `/pwa/icon-192.png` | Chrome install / fallback icon |
+| `/pwa/icon-512.png` | Optional full-resolution ordinary icon |
+| `/pwa/icon-maskable-512.png` | Android maskable icon |
+| `/pwa/apple-touch-icon.png` | Apple touch icon |
+| `/pwa/sw.js` | Service Worker (the API sends `Service-Worker-Allowed: /`) |
 
 **Do not bypass `/`, `/api/*`, `/*`, `/assets/*`, or other private paths.**
 Keep the existing Cloudflare Access policy on all application data and pages.
@@ -161,7 +166,7 @@ to Cloudflare Access.
 
 ### Install or reinstall on Android
 
-1. In regular **Android Chrome**, open the `/pwa-install.html` URL from the
+1. In regular **Android Chrome**, open the `/pwa/install.html` URL from the
    site itself, or visit **Settings → Install MyTrips** and open the linked page
    in Chrome. If the installed standalone app opens the link inside itself,
    copy the URL into Chrome manually.
@@ -171,18 +176,37 @@ to Cloudflare Access.
    Access / MyTrips as usual. Installing never grants access to private data.
 4. For troubleshooting, inspect `chrome://webapks`:
    - `Manifest URL` must be nonempty and point to
-     `https://mytrips.skybluestudio.net/manifest.json?v=6`.
+     `https://mytrips.skybluestudio.net/pwa/manifest.json?v=7`.
    - `Manifest Start URL` must be the origin root `/`, not whichever
      `/#/trips` or `/#/login` screen was open.
    - Theme and background colors should be populated.
 
-Only uninstall an *old incorrectly installed* white-circle WebAPK if needed
-before a clean install. **Normal application updates should not require
-uninstalling MyTrips.** The existing Service Worker remains unchanged and
-checks for updates when the app is brought back into focus. The manifest has a
-stable `id: "/"`, `start_url: "/"`, and `scope: "/"` so future deployments
-keep the installed app identity and launch URL.
+For this one-time path migration, **uninstall the existing MyTrips WebAPK**
+and install again from `/pwa/install.html`. The old root-level installation
+paths are intentionally removed. After reinstalling, regular app updates
+continue through `/pwa/sw.js` and should not require further reinstalls.
+The `id: "/"`, `start_url: "/"` and `scope: "/"` remain stable.
 
 If the public install page fails, compare the actual responses at the edge,
 check Chrome DevTools → Application → Manifest, and verify there are no
 unexpected redirects. Do not weaken the site's Access policy to fix an icon.
+
+### Verification of single-bypass migration
+
+After the new Docker image is deployed, verify these resources anonymously:
+
+```sh
+python3 scripts/check_pwa_install.py --origin https://mytrips.skybluestudio.net --install-page
+for path in /pwa/install.html /pwa/manifest.json /pwa/sw.js /pwa/icon-192.png /pwa/icon-maskable-512.png /; do
+  curl -sS -o /dev/null -w "$path HTTP=%{http_code} MIME=%{content_type}\\n" "https://mytrips.skybluestudio.net$path"
+done
+```
+
+Expect the five `/pwa/*` files to return HTTP 200 with correct media types,
+root `/` to return Access HTTP 302, and `/pwa/sw.js` to respond with
+`Service-Worker-Allowed: /`. Confirm Android Chrome's `chrome://webapks`
+shows `Manifest URL: https://mytrips.skybluestudio.net/pwa/manifest.json?v=7`.
+After successful verification, delete the five old **path-exact** Access Bypass
+rules for `/pwa-install.html`, `/manifest.json`, `/icon-192.png`,
+`/icon-maskable-512.png` and `/sw.js`; keep only the narrow `/pwa/*`
+Bypass on this host.

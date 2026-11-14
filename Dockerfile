@@ -27,9 +27,8 @@ COPY alembic/ ./alembic/
 COPY alembic.ini ./
 COPY load_airports.py ./
 
-# Frontend built assets (manifest.json is already in dist/ via public/)
+# Frontend built assets (pwa/ install assets are copied into dist by Vite)
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
-COPY frontend/sw.js ./frontend/
 
 # Locale JSONs — the backend translates notification text with these, and the
 # built frontend bundles them into JS, so they must ship as files too.

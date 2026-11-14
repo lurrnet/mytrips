@@ -21,7 +21,7 @@ if ('serviceWorker' in navigator) {
 
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/sw.js')
+      .register('/pwa/sw.js', { scope: '/', updateViaCache: 'none' })
       .then((reg) => {
         console.log('[SW] Registered:', reg.scope);
         // A backgrounded PWA reopened from the home screen often resumes its

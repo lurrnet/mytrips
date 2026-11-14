@@ -4,8 +4,8 @@
 Run on the OCI host first (bypasses Cloudflare Access):
     python3 scripts/check_pwa_install.py --origin http://127.0.0.1:8030
 
-External Cloudflare Access-protected origins may return a login redirect; that
-is an expected authentication boundary, not proof that the app is broken.
+The site root can be behind Cloudflare Access. Use --install-page for a
+public check that only requests assets under /pwa/.
 """
 
 import argparse
@@ -89,7 +89,7 @@ def run(origin, install_page=False):
     check(scheme.scheme == "https" or scheme.hostname in ("127.0.0.1", "localhost", "::1"),
           "Android PWA installation requires HTTPS (except localhost)")
 
-    page_url = urljoin(origin, "/pwa-install.html") if install_page else origin
+    page_url = urljoin(origin, "/pwa/install.html") if install_page else origin
     mime, html = download(page_url)
     check(mime == "text/html", f"Page returned {mime}, expected HTML")
     if install_page:
@@ -130,6 +130,7 @@ def run(origin, install_page=False):
     check(urlsplit(start).netloc == scheme.netloc, "start_url is not same-origin")
     check(urlsplit(start).path.startswith(urlsplit(urljoin(origin, manifest.get("scope", "/"))).path),
           "start_url falls outside manifest scope")
+    check(urlsplit(manifest_url).path == "/pwa/manifest.json", "Manifest must be under /pwa/")
     print("PASS  Manifest JSON, identity, scope, display mode")
 
     any_sizes = set()
@@ -160,11 +161,22 @@ def run(origin, install_page=False):
           "Chromium requires both 192x192 and 512x512 regular icons")
     check(512 in maskable_sizes, "512x512 maskable icon is missing")
 
-    sw_mime, sw = download(urljoin(origin, "/sw.js"))
+    sw_mime, sw = download(urljoin(origin, "/pwa/sw.js"))
     check(sw_mime in ("text/javascript", "application/javascript"),
           f"Service worker returned {sw_mime}, expected JavaScript")
     check(b"addEventListener('fetch'" in sw, "Service worker fetch handler missing")
-    print("PASS  Service worker HTTP response")
+    # /pwa/sw.js must be authorized to control / (outside its default scope).
+    # Verify the canonical origin's response headers, not just the MIME.
+    request = Request(urljoin(origin, "/pwa/sw.js"), headers={"User-Agent": "MyTrips-PWA-Install-Check/1.0"})
+    with urlopen(request, timeout=12) as response:
+        check(response.geturl() == request.full_url, "Service worker redirected")
+        check(response.headers.get("Service-Worker-Allowed") == "/",
+              "Missing Service-Worker-Allowed: / for root-scope worker")
+    print("PASS  Service worker HTTP response + root scope header")
+    if install_page:
+        # All public resources must remain inside the single Bypass prefix.
+        for p in (page_url, manifest_url, fallback_url):
+            check(urlsplit(p).path.startswith("/pwa/"), f"Public asset escaped /pwa/: {p}")
     print("\nPASS  MyTrips PWA installability resources are valid")
     print("NOTE  Android installation can still be blocked by Cloudflare Access, old browser cache, or phone settings")
 
@@ -174,7 +186,7 @@ if __name__ == "__main__":
     parser.add_argument("--origin", default="http://127.0.0.1:8030",
                         help="MyTrips origin (default: http://127.0.0.1:8030)")
     parser.add_argument("--install-page", action="store_true",
-                        help="Check /pwa-install.html directly (for external Access-bypassed bootstrap)")
+                        help="Check /pwa/install.html directly (for single-path public Access bypass)")
     args = parser.parse_args()
     try:
         run(args.origin, args.install_page)
