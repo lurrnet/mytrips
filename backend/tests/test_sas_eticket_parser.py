@@ -20,7 +20,12 @@ def dt(year, month, day, hour, minute) -> datetime:
 
 @pytest.fixture(scope="module")
 def sas_scandinavian_airlines_email():
-    return load_eml_as_email_message("sas_eticket_pdf_anonymized.eml")
+    # The anonymized receipt was received in Sep 2025 and describes a
+    # yearless November 2026 itinerary. Never use the runner's wall clock:
+    # after 2026-11-12 that incorrectly shifts the fixture to November 2027.
+    message = load_eml_as_email_message("sas_eticket_pdf_anonymized.eml")
+    message.date = datetime(2025, 9, 9, tzinfo=UTC)
+    return message
 
 
 @pytest.fixture(scope="module")
