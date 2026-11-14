@@ -1,8 +1,11 @@
 """Public PWA endpoints must fail closed under the Cloudflare /pwa/* Bypass."""
 from pathlib import Path
 
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+import backend.main as main
 from backend.main import app
 
 
@@ -49,10 +52,6 @@ def test_public_pwa_allowlist_is_explicit_and_contains_no_secrets():
 
 
 def test_public_pwa_symlink_is_rejected_even_for_an_allowlisted_file(tmp_path, monkeypatch):
-    import pytest
-    from fastapi import HTTPException
-    import backend.main as main
-
     public = tmp_path / "pwa"
     public.mkdir()
     (public / "icon-192.png").symlink_to(Path(__file__).resolve())
