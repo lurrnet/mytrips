@@ -192,3 +192,44 @@ linked the authenticated web page to its manifest. Verify the exact
 **Application → Manifest**; make sure the page has the `rel=manifest` link.
 The explicit PNG HTML icon makes the fallback sharper but cannot substitute
 for Chrome adopting the manifest. Keep Access on `/` and `/api/*`.
+
+
+### Public diagnostic installation page (Android Chrome)
+
+If freshly installed Android WebAPK entries still show a blank `Manifest URL`,
+a blank theme color, and a `Manifest Start URL` equal to the current
+`/#/trips` or `/#/login` page despite public PNG and manifest resources,
+use an isolated **static** installation page to diagnose adoption.
+
+The built frontend includes `/pwa-install.html`. To try this experiment,
+create a **path-exact** Cloudflare Access Bypass rule for
+`https://mytrips.skybluestudio.net/pwa-install.html`. Also allow
+`/sw.js` as a precise path if a clean, unauthenticated installation page
+needs to register the existing service worker. Both are static resources
+that must be reviewed before publication. Keep `/`, `/api/*`, and
+all travel data behind the existing Access application; do **not**
+bypass `/*`. The pre-existing icon/manifest bypass paths stay as-is.
+If the edge denies `/sw.js`, the diagnostic page will report worker failure.
+
+After rebuilding and applying the precise Bypass routes:
+
+```sh
+python3 scripts/check_pwa_install.py --origin http://127.0.0.1:8030 --install-page
+python3 scripts/check_pwa_install.py --origin https://mytrips.skybluestudio.net --install-page
+```
+
+The external install-page test verifies the HTML, manifest, icons and
+worker without cookies; it does not test the protected start URL, remote
+Chrome's manifest adoption, or whether the phone received a full install.
+Open `https://mytrips.skybluestudio.net/pwa-install.html` **in a normal
+Android Chrome tab**, uninstall the old MyTrips WebAPK from Android
+Settings first, and use Chrome's *Install app* option on that static page.
+Check `chrome://webapks`. If Manifest URL is now populated, the
+authenticated main page was interfering with manifest adoption; if it
+is still blank, inspect Android Chrome's manifest processing/errors
+before making additional image changes. Preserve the canonical manifest
+`id: "/"`, `start_url: "/"`, and `scope: "/"` throughout the test.
+
+This is a controlled diagnostic, not a guarantee that Chrome will use
+the manifest. A WebAPK can exist in Chrome's records even if Chrome
+installed using fallback metadata.
