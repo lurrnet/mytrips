@@ -72,7 +72,7 @@ jobs:
 
   e2e:
     name: E2E tests (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [backend, frontend]
     steps:
       - name: Checkout
@@ -116,7 +116,7 @@ jobs:
 
   pwa-browser:
     name: PWA Chromium runtime gate (required)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v5
