@@ -32,8 +32,10 @@ def audit() -> None:
     if manifest.get("id") != "/" or manifest.get("scope") != "/":
         failures.append("PWA manifest must have explicit stable id and scope")
     html = (ROOT / "frontend/index.html").read_text()
-    if 'href="/manifest.json?v=5" crossorigin="use-credentials"' not in html:
-        failures.append("PWA manifest must send Cloudflare Access credentials")
+    if 'href="/manifest.json?v=6"' not in html or 'crossorigin="use-credentials"' in html:
+        failures.append("PWA manifest must be referenced without credentials (public Access bypass)")
+    if 'rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=5"' not in html:
+        failures.append("HTML must provide a 192px PNG fallback icon for Android")
 
     if manifest.get("name") != "MyTrips" or manifest.get("short_name") != "MyTrips":
         failures.append("PWA manifest name and short_name must both be MyTrips")

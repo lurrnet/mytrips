@@ -111,12 +111,17 @@ existing installed PWA title remains stale after update, reinstall the PWA.
 
 ## Android PWA install: "This app cannot be installed"
 
-MyTrips is deployed behind Cloudflare Access. Chromium may fail to load a
-credential-protected manifest without `crossorigin="use-credentials"` even when
-the manifest is on the same origin. The frontend now includes this attribute;
-the Manifest has an explicit stable ID/scope, and its response uses
-`application/manifest+json` with no-cache headers. The service worker avoids
-caching installation metadata and icon URLs.
+MyTrips is deployed behind Cloudflare Access. Chrome may create a fallback
+WebAPK with a white-circle favicon, an empty `Manifest URL` and missing colors
+when the page does not adopt the web manifest. Only the static `/manifest.json`,
+`/icon-192.png` and `/icon-maskable-512.png` paths should have an explicit,
+narrowly scoped Cloudflare Access **Bypass** policy; `/` and `/api/*` must remain
+protected. Once the manifest is publicly accessible, the HTML links it without
+`crossorigin="use-credentials"`; Chrome can fetch it without Access cookies.
+The HTML also provides a high-resolution 192px PNG `rel=icon` as a fallback.
+The manifest retains an explicit stable ID/scope, is served as
+`application/manifest+json` with no-cache headers, and the service worker does
+not cache installation metadata or icons.
 
 **First verify the app itself, without changing Access security settings:**
 
@@ -139,7 +144,7 @@ If the localhost checks pass but Android Chrome still reports it cannot install:
 3. Reload, then try the Chrome three-dot install option again. If an older
    MyTrips/Partiu PWA is installed, uninstall the existing app first.
 4. In Chrome desktop DevTools → **Application → Manifest**, inspect install
-   errors and inspect the `manifest.json?v=4` request under **Network**.
+   errors and inspect the `manifest.json?v=6` request under **Network**.
    It must return **200**, `application/manifest+json`, **MyTrips JSON**
    instead of Access HTML or a 302 redirect. Icon URLs must return **200
    image/png**, not `text/html`. Service worker `/sw.js` must load as JS.
@@ -174,3 +179,16 @@ Android Settings → Apps. A WebAPK appears as an installed app; a browser
 shortcut may only exist on the home screen. If MyTrips is not a WebAPK, diagnose
 Chrome installation eligibility and Cloudflare Access/minting compatibility,
 not icon colors. Keep Cloudflare Access enabled.
+
+
+### Android WebAPK missing Manifest URL (white-circle icon)
+
+When `chrome://webapks` shows `Manifest URL:` and `Theme color:` blank after a
+fresh install, treat the installation as a likely fallback / DIY WebAPK, even
+if it has an Android package name and standalone display. A correct local
+`check_pwa_install.py` run proves the OCI origin works, **not** that Chrome
+linked the authenticated web page to its manifest. Verify the exact
+`/manifest.json?v=6` response in the Android Chrome session or remote DevTools
+**Application → Manifest**; make sure the page has the `rel=manifest` link.
+The explicit PNG HTML icon makes the fallback sharper but cannot substitute
+for Chrome adopting the manifest. Keep Access on `/` and `/api/*`.
