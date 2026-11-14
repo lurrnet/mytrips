@@ -209,8 +209,28 @@ The original Partiu project maintains a public demo (not operated by MyTrips) at
 - Full light and dark themes, following the system or forced from Settings; print styles force light
 
 ### PWA
-- Installable on iOS and Android as a home screen app
-- Works as a PWA — offline-capable shell, responsive from phone to desktop
+
+MyTrips supports installation on Android and iOS. It provides an offline-capable
+shell and responsive layouts; live trip data requires a connection.
+
+**Android Chrome (recommended):** Open `https://YOUR-MYTRIPS-HOST/pwa-install.html`
+directly in **Chrome** and choose **Install app** from the browser menu (or use
+the page's Install button when available). You can also reach this page from
+**Settings → Install MyTrips**. Do **not** initiate installation from a signed-in
+`/#/trips` route: behind Cloudflare Access, Chrome may generate a fallback
+WebAPK with a white-circle launcher icon and an empty Manifest URL. The dedicated
+public page has been verified to install with the correct icon and Manifest URL.
+
+**Cloudflare Access setup:** When the web app is protected by Access, add
+**exact-path Bypass** rules for `/pwa-install.html`, `/manifest.json`,
+`/icon-192.png`, `/icon-maskable-512.png`, and `/sw.js`. These resources
+are static and contain no trip information. Keep `/`, `/api/*`, and all other
+application paths protected. Never bypass `/*` for PWA installation. See
+[OCI deployment and PWA setup](docs/P0_SECURITY_AND_DEPLOYMENT.md#android-pwa-installation).
+
+**iPhone/iPad:** In Safari use **Share → Add to Home Screen**. The standalone
+app uses the existing Service Worker update flow; normal code updates do not
+require uninstalling and reinstalling the app.
 
 ## Supported airlines
 
