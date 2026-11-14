@@ -45,3 +45,18 @@ def test_public_pwa_allowlist_is_explicit_and_contains_no_secrets():
     }
     for name in _PUBLIC_PWA_FILES:
         assert (Path(__file__).resolve().parents[2] / "frontend" / "public" / "pwa" / name).is_file()
+
+
+
+def test_public_pwa_symlink_is_rejected_even_for_an_allowlisted_file(tmp_path, monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+    import backend.main as main
+
+    public = tmp_path / "pwa"
+    public.mkdir()
+    (public / "icon-192.png").symlink_to(Path(__file__).resolve())
+    monkeypatch.setattr(main, "_FRONTEND_DIR", tmp_path)
+    with pytest.raises(HTTPException) as exc:
+        main._pwa_asset("icon-192.png")
+    assert exc.value.status_code == 404
