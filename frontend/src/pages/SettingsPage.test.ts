@@ -172,6 +172,17 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(container.textContent).toContain('settings.notif_title'));
   });
 
+  it('links all users to the dedicated public Android PWA install page', async () => {
+    const { container } = render(SettingsPage);
+    await waitFor(() => expect(container.textContent).toContain('settings.pwa_install_title'));
+    const link = container.querySelector<HTMLAnchorElement>('a[href="/pwa-install.html"]');
+    expect(link).not.toBeNull();
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.getAttribute('rel')).toContain('noopener');
+    expect(link?.getAttribute('rel')).toContain('noreferrer');
+    expect(link?.textContent?.trim()).toBe('settings.pwa_install_button');
+  });
+
   it('renders appearance section', async () => {
     const { container } = render(SettingsPage);
     await waitFor(() => expect(container.textContent).toContain('settings.appearance'));
