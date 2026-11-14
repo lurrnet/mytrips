@@ -24,6 +24,7 @@ class ManifestLinkParser(HTMLParser):
         self.links = []
         self.icon_links = []
         self.logo_images = []
+        self.scripts = []
 
     def handle_starttag(self, tag, attrs):
         values = dict(attrs)
@@ -35,6 +36,8 @@ class ManifestLinkParser(HTMLParser):
                 self.icon_links.append(values)
         if tag == "img" and "logo" in values.get("class", "").split():
             self.logo_images.append(values)
+        if tag == "script":
+            self.scripts.append(values)
 
 
 def check(condition, error):
@@ -105,6 +108,15 @@ def run(origin, install_page=False):
     parser.feed(html.decode("utf-8", errors="replace"))
     check(len(parser.links) == 1, f"Expected exactly one manifest link, got {len(parser.links)}")
     link = parser.links[0]
+    if install_page:
+        check(len(parser.scripts) == 1 and parser.scripts[0].get("src") == "/pwa/install.js?v=1",
+              "Public installer must load one CSP-safe /pwa/install.js script")
+        js_mime, js = download(urljoin(page_url, parser.scripts[0]["src"]))
+        check(js_mime in ("text/javascript", "application/javascript"),
+              f"Installer JavaScript has invalid MIME: {js_mime}")
+        check(b"navigator.serviceWorker.register('/pwa/sw.js'" in js,
+              "External installer script does not register the canonical worker")
+        print("PASS  External installer JavaScript executes under same-origin CSP policy (HTTP check)")
     check("crossorigin" not in link,
           "Public manifest should use default credential-free fetch (remove crossorigin)")
     fallback_icons = [icon for icon in parser.icon_links
