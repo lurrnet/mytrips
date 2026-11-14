@@ -268,7 +268,7 @@ and relevant Cloudflare features, including Rocket Loader/Zaraz/analytics.
 After deployment check the header, script tags and functional resources:
 
 ```sh
-curl -fsSI https://mytrips.skybluestudio.net/pwa/install.html | grep -iE 'HTTP/|cache-control:|content-security-policy:'
+curl -fsS -D - -o /dev/null https://mytrips.skybluestudio.net/pwa/install.html | grep -iE 'HTTP/|cache-control:|content-security-policy:'
 curl -fsS https://mytrips.skybluestudio.net/pwa/install.html | grep -oE '<script[^>]*>'
 python3 scripts/check_pwa_install.py --origin https://mytrips.skybluestudio.net --install-page
 ```
