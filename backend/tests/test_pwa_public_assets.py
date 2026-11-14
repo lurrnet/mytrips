@@ -26,8 +26,13 @@ def test_public_pwa_directory_allows_only_reviewed_static_files():
         assert client.get("/pwa/sw.js").headers["service-worker-allowed"] == "/"
         installer = client.get("/pwa/install.html")
         assert installer.headers["cache-control"] == "no-store, no-transform"
-        assert "script-src 'self'" in installer.headers["content-security-policy"]
-        assert "unsafe-inline" not in installer.headers["content-security-policy"]
+        directives = {
+            value.split()[0]: value.strip()
+            for value in installer.headers["content-security-policy"].split(";")
+            if value.strip()
+        }
+        assert directives["script-src"] == "script-src 'self'"
+        assert "unsafe-inline" not in directives["script-src"]
         assert "no-transform" not in client.get("/pwa/manifest.json").headers["cache-control"]
 
 
