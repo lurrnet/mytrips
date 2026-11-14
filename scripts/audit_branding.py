@@ -53,10 +53,10 @@ def audit() -> None:
 
     # Assert the approved app artwork reaches each public icon endpoint.
     icons = {
-        "frontend/public/icon-192.png": 192,
-        "frontend/public/icon-512.png": 512,
-        "frontend/public/icon-maskable-512.png": 512,
-        "frontend/public/apple-touch-icon.png": 180,
+        "frontend/public/pwa/icon-192.png": 192,
+        "frontend/public/pwa/icon-512.png": 512,
+        "frontend/public/pwa/icon-maskable-512.png": 512,
+        "frontend/public/pwa/apple-touch-icon.png": 180,
         "frontend/public/mytrips-brand.png": 64,
         "frontend/public/mytrips-original-A.png": 393,
     }
@@ -73,6 +73,9 @@ def audit() -> None:
     for filename in ("manifest.json", "install.html", "sw.js"):
         if not (ROOT / "frontend/public/pwa" / filename).is_file():
             failures.append(f"Missing consolidated PWA resource: {filename}")
+    for path in ("frontend/public/pwa-install.html", "frontend/public/manifest.json", "frontend/sw.js"):
+        if (ROOT / path).exists():
+            failures.append(f"Legacy PWA resource should be removed: {path}")
     ico_path = ROOT / "frontend/public/favicon.ico"
     if ico_path.read_bytes()[:4] != bytes([0, 0, 1, 0]):
         failures.append("favicon.ico has invalid ICO header")
