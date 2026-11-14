@@ -210,3 +210,20 @@ After successful verification, delete the five old **path-exact** Access Bypass
 rules for `/pwa-install.html`, `/manifest.json`, `/icon-192.png`,
 `/icon-maskable-512.png` and `/sw.js`; keep only the narrow `/pwa/*`
 Bypass on this host.
+
+## PWA privacy: network-only travel API (Service Worker v25)
+
+The Service Worker at `/pwa/sw.js` does **not cache or serve any `/api` or
+`/api/*` response**, regardless of method. Requests and network errors pass
+through to the server/browser normally, including authentication and writes;
+offline use does not fall back to another account's saved trips or stats.
+Only non-sensitive `/assets/*`, `/fonts/*`, and successful root app-shell HTML
+are eligible for worker caching. Other downloads and documents remain
+network-only. The new worker activation deletes all old `mytrips-api-*` and
+`partiu-api-*` caches as well as obsolete MyTrips shell caches before taking
+control; the login/logout cache purge is kept as defense in depth.
+
+After deploying, allow the browser to load the new worker, then confirm that
+travel data requires a working network connection. This worker policy does
+not clear independent browser HTTP caches, server caches, or any data that
+other application code may persist outside Service Worker CacheStorage.
