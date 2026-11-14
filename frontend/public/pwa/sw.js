@@ -1,23 +1,19 @@
 /**
  * Service Worker for MyTrips PWA.
  *
- * Strategies:
- *   - GET /api/auth/*      → network-first (session state must always be fresh)
- *   - GET /api/*           → stale-while-revalidate (serve cache instantly, update in background)
- *   - non-GET /api/*       → pass-through, wiping the API cache *before* answering, so the
- *                            re-read that follows a mutation cannot be served a stale copy
- *   - /assets/*            → cache-first (content-hashed filenames)
- *   - everything else      → network-first (app shell, always get latest deploy)
+ * Privacy-first strategies:
+ *   - /api and /api/* (ALL methods) → network only; no CacheStorage reads/writes
+ *   - /assets/* and /fonts/*       → cache-first (non-sensitive static assets)
+ *   - HTML navigation             → network-first; cache only successful app-shell HTML
+ *   - everything else             → browser network (not cached by this worker)
  *
- * Cross-origin requests are not handled at all — see the fetch listener.
+ * On activation, erase old MyTrips/Partiu API caches, which may contain
+ * private trip data from previous accounts. Cross-origin traffic is untouched.
  */
 
-const CACHE_VERSION = 'v24';
+const CACHE_VERSION = 'v25';
 const STATIC_CACHE = `mytrips-static-${CACHE_VERSION}`;
-const API_CACHE = `mytrips-api-${CACHE_VERSION}`;
-
-const API_CACHE_MAX = 150;   // max cached GET /api/* responses
-const STATIC_CACHE_MAX = 80; // max cached static assets
+const STATIC_CACHE_MAX = 80; // cap cached app-shell and static files
 
 const trimInProgress = new Set();
 
@@ -26,164 +22,94 @@ self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-// ---- Activate: clean up old caches ----
+// ---- Activate: erase legacy private API caches and old shell versions ----
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((k) => k !== STATIC_CACHE && k !== API_CACHE)
-            .map((k) => caches.delete(k))
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names
+      .filter((name) =>
+        name.startsWith('mytrips-api-') ||
+        name.startsWith('partiu-api-') ||
+        name.startsWith('partiu-static-') ||
+        (name.startsWith('mytrips-static-') && name !== STATIC_CACHE)
       )
-    )
-  );
-  self.clients.claim();
+      .map((name) => caches.delete(name)));
+    // Claim clients only after old private caches are removed.
+    await self.clients.claim();
+  })());
 });
 
-// ---- Fetch: routing strategy ----
+// ---- Fetch: only shell/static files are eligible for caching ----
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+  const request = event.request;
+  const url = new URL(request.url);
 
-  // Third-party requests — map tiles, above all — go straight to the network.
-  // The catch-all below is meant for the app shell, but it was matching on
-  // pathname alone and so swallowed basemap tiles too, answering a dropped one
-  // with a JSON 503. That turns a blip the browser would have retried into a
-  // hard image error, which is exactly what the map reads as "this basemap is
-  // blocked". Nothing cross-origin is cacheable here anyway: these are no-cors
-  // requests, so the responses are opaque.
+  // Leave cross-origin requests entirely to the browser.
   if (url.origin !== self.location.origin) return;
 
-  // Android install metadata must never use a stale or accidentally cached
-  // Cloudflare Access sign-in page. The browser needs a fresh manifest and PNG.
-  const installAssetPaths = new Set([
-    '/manifest.json', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png',
-    '/pwa/manifest.json', '/pwa/icon-192.png', '/pwa/icon-512.png', '/pwa/icon-maskable-512.png', '/pwa/apple-touch-icon.png',
-  ]);
-  if (installAssetPaths.has(url.pathname)) {
-    event.respondWith(fetch(event.request));
+  // Every API request, including login/authentication and mutations, goes
+  // straight to the network. Never fall back to stale account data on failure.
+  if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request));
     return;
   }
 
-  if (url.pathname.startsWith('/api/')) {
-    // Mutations pass through unchanged, but any successful one invalidates the
-    // whole API cache — otherwise a GET right after a POST/PATCH/DELETE can be
-    // served stale-while-revalidate's "stale" copy from before the mutation.
-    //
-    // The purge is **awaited before the response is handed back**, not run in
-    // `waitUntil`. `waitUntil` only keeps the worker alive; it makes no promise
-    // about finishing before the next fetch, so the page's re-read could — and
-    // did — race it and win, serving the pre-mutation copy. Saving a budget
-    // showed the old figure until you navigated away and back, because the GET
-    // that followed the PUT beat the purge to the cache.
-    //
-    // Awaiting costs one local CacheStorage sweep on the mutation's path and
-    // buys a real ordering guarantee: by the time the page sees the mutation
-    // resolve, there is nothing stale left to serve it.
-    if (event.request.method !== 'GET') {
-      event.respondWith(
-        (async () => {
-          const response = await fetch(event.request);
-          if (response.ok) await purgeApiCache();
-          return response;
-        })()
-      );
-      return;
-    }
+  // No non-GET response is ever stored in CacheStorage.
+  if (request.method !== 'GET') return;
 
-    // Auth endpoints are always network-first so session state is never stale
-    if (url.pathname.startsWith('/api/auth/')) {
-      event.respondWith(networkFirst(event.request, API_CACHE));
-      return;
-    }
+  // Installation resources must always be fetched fresh. In particular, do
+  // not accidentally cache a Cloudflare Access challenge under a PWA URL.
+  if (url.pathname.startsWith('/pwa/')) return;
 
-    // All other GET API calls: serve stale immediately, revalidate in background
-    event.respondWith(staleWhileRevalidate(event.request, API_CACHE));
+  // Fingerprinted JS/CSS and self-hosted fonts contain no user records.
+  if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/fonts/')) {
+    event.respondWith(cacheFirstStatic(request));
     return;
   }
 
-  // Hashed static assets (/assets/*): cache-first — filenames change on deploy
-  if (url.pathname.startsWith('/assets/')) {
-    event.respondWith(cacheFirst(event.request, STATIC_CACHE));
-    return;
+  // App navigation is network-first; only the static HTML shell is cached.
+  // Other same-origin resources (e.g. private documents) stay network-only.
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirstShell(request));
   }
-
-  // HTML / navigation: network-first so the app shell is always fresh after a deploy
-  event.respondWith(networkFirst(event.request, STATIC_CACHE));
 });
 
-// ---- Strategies ----
+// ---- Limited, non-sensitive cache strategies ----
 
-async function cacheFirst(request, cacheName) {
-  const cached = await caches.match(request);
+async function cacheFirstStatic(request) {
+  const cache = await caches.open(STATIC_CACHE);
+  const cached = await cache.match(request);
   if (cached) return cached;
 
+  const response = await fetch(request);
+  // Never store a redirect (for example, Cloudflare Access sign-in HTML).
+  if (response.ok && !response.redirected) {
+    await cache.put(request, response.clone());
+    try { await trimCache(cache, STATIC_CACHE_MAX); } catch (e) { console.warn('[SW] trimCache error', e); }
+  }
+  return response;
+}
+
+async function networkFirstShell(request) {
+  const cache = await caches.open(STATIC_CACHE);
   try {
     const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(cacheName);
+    const url = new URL(request.url);
+    const isShellPath = url.pathname === '/' || url.pathname === '/index.html';
+    const isHtml = response.headers.get('content-type')?.toLowerCase().includes('text/html');
+    if (isShellPath && isHtml && response.ok && !response.redirected) {
       await cache.put(request, response.clone());
       try { await trimCache(cache, STATIC_CACHE_MAX); } catch (e) { console.warn('[SW] trimCache error', e); }
     }
     return response;
   } catch {
-    return new Response('<h1>Offline</h1>', {
-      headers: { 'Content-Type': 'text/html' },
-    });
-  }
-}
-
-async function networkFirst(request, cacheName) {
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(cacheName);
-      await cache.put(request, response.clone());
-      try { await trimCache(cache, API_CACHE_MAX); } catch (e) { console.warn('[SW] trimCache error', e); }
-    }
-    return response;
-  } catch {
-    const cached = await caches.match(request);
+    // Old CacheStorage versions are not consulted (they may contain private data).
+    const cached = await cache.match(request);
     if (cached) return cached;
-    return new Response(JSON.stringify({ error: 'Offline' }), {
-      headers: { 'Content-Type': 'application/json' },
+    return new Response('<h1>Offline</h1>', {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
       status: 503,
     });
-  }
-}
-
-async function staleWhileRevalidate(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-
-  // Always kick off a background network fetch to keep the cache warm
-  const networkFetch = fetch(request)
-    .then(async (response) => {
-      if (response.ok) {
-        await cache.put(request, response.clone());
-        try { await trimCache(cache, API_CACHE_MAX); } catch (e) { console.warn('[SW] trimCache error', e); }
-      }
-      return response;
-    })
-    .catch(() => null);
-
-  // Return stale immediately if available; background fetch will update the cache
-  if (cached) return cached;
-
-  // No cached copy — must wait for the network
-  const response = await networkFetch;
-  if (response) return response;
-  return new Response(JSON.stringify({ error: 'Offline' }), {
-    headers: { 'Content-Type': 'application/json' },
-    status: 503,
-  });
-}
-
-async function purgeApiCache() {
-  try {
-    const cache = await caches.open(API_CACHE);
-    const keys = await cache.keys();
-    await Promise.all(keys.map((k) => cache.delete(k)));
-  } catch (e) {
-    console.warn('[SW] purgeApiCache failed', e);
   }
 }
 
