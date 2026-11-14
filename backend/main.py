@@ -213,28 +213,35 @@ def _resolve_static_file(base: Path, full_path: str) -> Path | None:
 # Serve frontend static files if directory exists
 if _FRONTEND_DIR.exists():
 
-    @app.get("/manifest.json")
-    def serve_manifest():
-        manifest = _FRONTEND_DIR / "manifest.json"
-        if manifest.exists():
-            return FileResponse(str(manifest), media_type="application/manifest+json", headers={"Cache-Control": "no-cache"})
-        # Dev mode: manifest lives in public/, not in frontend root
-        fallback = Path(__file__).parent.parent / "frontend" / "public" / "manifest.json"
-        return FileResponse(str(fallback), media_type="application/manifest+json", headers={"Cache-Control": "no-cache"})
-
-    # Never let browsers cache the service worker script or the SPA shell:
-    # both must be revalidated on every request so a new deploy is picked up
-    # promptly instead of being served stale from the HTTP cache.
+    # Public installation resources are served from one /pwa/* namespace.
+    # Both legacy URLs remain aliases so already-installed WebAPKs can update
+    # while users transition. The Access Bypass rule should target only /pwa/*.
     _NO_CACHE_HEADERS = {"Cache-Control": "no-cache"}
+    _WORKER_HEADERS = {"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"}
+
+    def _pwa_asset(filename: str) -> Path:
+        built = _FRONTEND_DIR / "pwa" / filename
+        if built.is_file():
+            return built
+        return Path(__file__).parent.parent / "frontend" / "public" / "pwa" / filename
+
+    @app.get("/manifest.json")
+    @app.get("/pwa/manifest.json")
+    def serve_manifest():
+        return FileResponse(
+            str(_pwa_asset("manifest.json")),
+            media_type="application/manifest+json",
+            headers=_NO_CACHE_HEADERS,
+        )
 
     @app.get("/sw.js")
+    @app.get("/pwa/sw.js")
     def serve_sw():
-        sw = _FRONTEND_DIR / "sw.js"
-        if sw.exists():
-            return FileResponse(str(sw), headers=_NO_CACHE_HEADERS)
-        # sw.js lives in frontend/ root, not in dist/
-        fallback = Path(__file__).parent.parent / "frontend" / "sw.js"
-        return FileResponse(str(fallback), headers=_NO_CACHE_HEADERS)
+        return FileResponse(
+            str(_pwa_asset("sw.js")),
+            media_type="text/javascript",
+            headers=_WORKER_HEADERS,
+        )
 
     # Mount all built assets (Vite outputs assets/ subdir with hashed filenames)
     app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIR / "assets")), name="assets") if (
