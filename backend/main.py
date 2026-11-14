@@ -219,11 +219,31 @@ if _FRONTEND_DIR.exists():
     _NO_CACHE_HEADERS = {"Cache-Control": "no-cache"}
     _WORKER_HEADERS = {"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"}
 
+    # Every filename is audited before serving, including manifest and SW
+    # routes. Reject symlinks even if they point somewhere inside the directory.
+    _PUBLIC_PWA_FILES = frozenset({
+        "install.html", "install.js", "manifest.json", "sw.js",
+        "icon-192.png", "icon-512.png", "icon-maskable-512.png",
+        "apple-touch-icon.png",
+    })
+
     def _pwa_asset(filename: str) -> Path:
-        built = _FRONTEND_DIR / "pwa" / filename
-        if built.is_file():
-            return built
-        return Path(__file__).parent.parent / "frontend" / "public" / "pwa" / filename
+        from fastapi import HTTPException
+
+        if filename not in _PUBLIC_PWA_FILES:
+            raise HTTPException(status_code=404, detail="Not found")
+        bases = (
+            _FRONTEND_DIR / "pwa",
+            Path(__file__).parent.parent / "frontend" / "public" / "pwa",
+        )
+        for base in bases:
+            candidate = base / filename
+            if base.is_symlink() or candidate.is_symlink():
+                raise HTTPException(status_code=404, detail="Not found")
+            resolved = _resolve_static_file(base, filename)
+            if resolved is not None:
+                return resolved
+        raise HTTPException(status_code=404, detail="Not found")
 
     @app.get("/pwa/manifest.json")
     def serve_manifest():
@@ -241,25 +261,10 @@ if _FRONTEND_DIR.exists():
             headers=_WORKER_HEADERS,
         )
 
-    # Fail closed: Cloudflare Access bypasses the entire /pwa/* prefix.
-    # Only explicitly reviewed static files may ever be served anonymously.
-    _PUBLIC_PWA_FILES = frozenset({
-        "install.html", "install.js", "manifest.json", "sw.js",
-        "icon-192.png", "icon-512.png", "icon-maskable-512.png",
-        "apple-touch-icon.png",
-    })
-
+    # Fail closed: Cloudflare Access bypasses /pwa/* only.
     @app.get("/pwa/{asset_path:path}")
     def serve_public_pwa_asset(asset_path: str):
-        from fastapi import HTTPException
-
-        if asset_path not in _PUBLIC_PWA_FILES:
-            raise HTTPException(status_code=404, detail="Not found")
-        for base in (_FRONTEND_DIR / "pwa", Path(__file__).parent.parent / "frontend" / "public" / "pwa"):
-            asset = _resolve_static_file(base, asset_path)
-            if asset is not None:
-                return FileResponse(str(asset), headers=_NO_CACHE_HEADERS)
-        raise HTTPException(status_code=404, detail="Not found")
+        return FileResponse(str(_pwa_asset(asset_path)), headers=_NO_CACHE_HEADERS)
 
     # Mount all built assets (Vite outputs assets/ subdir with hashed filenames)
     app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIR / "assets")), name="assets") if (
