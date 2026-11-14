@@ -241,6 +241,26 @@ if _FRONTEND_DIR.exists():
             headers=_WORKER_HEADERS,
         )
 
+    # Fail closed: Cloudflare Access bypasses the entire /pwa/* prefix.
+    # Only explicitly reviewed static files may ever be served anonymously.
+    _PUBLIC_PWA_FILES = frozenset({
+        "install.html", "install.js", "manifest.json", "sw.js",
+        "icon-192.png", "icon-512.png", "icon-maskable-512.png",
+        "apple-touch-icon.png",
+    })
+
+    @app.get("/pwa/{asset_path:path}")
+    def serve_public_pwa_asset(asset_path: str):
+        from fastapi import HTTPException
+
+        if asset_path not in _PUBLIC_PWA_FILES:
+            raise HTTPException(status_code=404, detail="Not found")
+        for base in (_FRONTEND_DIR / "pwa", Path(__file__).parent.parent / "frontend" / "public" / "pwa"):
+            asset = _resolve_static_file(base, asset_path)
+            if asset is not None:
+                return FileResponse(str(asset), headers=_NO_CACHE_HEADERS)
+        raise HTTPException(status_code=404, detail="Not found")
+
     # Mount all built assets (Vite outputs assets/ subdir with hashed filenames)
     app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIR / "assets")), name="assets") if (
         _FRONTEND_DIR / "assets"
@@ -251,6 +271,11 @@ if _FRONTEND_DIR.exists():
     @app.get("/{full_path:path}")
     def serve_spa(full_path: str):
         """Serve static files or the SPA shell for all non-API routes."""
+        # Never serve the SPA as a fallback for missing public PWA resources.
+        if full_path == "pwa" or full_path.startswith("pwa/"):
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="Not found")
         if full_path.startswith("api/"):
             from fastapi import HTTPException
 
