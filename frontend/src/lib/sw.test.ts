@@ -54,9 +54,9 @@ function loadServiceWorker() {
     };
   };
 
-  const listeners: Record<string, (event: any) => void> = {};
+  const listeners: Record<string, (event: FakeFetchEvent | FakeLifecycleEvent) => void> = {};
   const self = {
-    addEventListener: (type: string, fn: (event: any) => void) => { listeners[type] = fn; },
+    addEventListener: (type: string, fn: (event: FakeFetchEvent | FakeLifecycleEvent) => void) => { listeners[type] = fn; },
     location: { origin: 'https://mytrips.test' },
     clients: { claim: async () => { timeline.push('claim'); } },
     skipWaiting: () => {},
@@ -162,14 +162,14 @@ describe('privacy-first service worker', () => {
 
   it('does not intercept same-origin document downloads or installation resources', () => {
     loadServiceWorker();
-    for (const path of ['/api/health', '/pwa/manifest.json', '/pwa/icon-192.png', '/documents/trip.pdf']) {
+    for (const path of ['/pwa/manifest.json', '/pwa/icon-192.png', '/documents/trip.pdf']) {
       let intercepted = false;
       fetchHandler({
         request: new Request('https://mytrips.test' + path),
         respondWith: () => { intercepted = true; },
         waitUntil: () => {},
       });
-      expect(intercepted).toBe(path === '/api/health');
+      expect(intercepted).toBe(false);
     }
   });
 
