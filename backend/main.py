@@ -217,6 +217,11 @@ if _FRONTEND_DIR.exists():
     # The new root-scoped SW is served from /pwa/sw.js with an explicit
     # Service-Worker-Allowed header; legacy root-level URLs are not aliased.
     _NO_CACHE_HEADERS = {"Cache-Control": "no-cache"}
+    # The public installer must remain unmodified at the edge. Cloudflare
+    # JavaScript Detections can inject an inline <script> into HTML, conflicting
+    # with our strict CSP and failing the canonical script-count audit.
+    # no-transform opts this one static page out of that injection only.
+    _INSTALL_HTML_HEADERS = {"Cache-Control": "no-store, no-transform"}
     _WORKER_HEADERS = {"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"}
 
     # Every filename is audited before serving, including manifest and SW
@@ -264,7 +269,8 @@ if _FRONTEND_DIR.exists():
     # Fail closed: Cloudflare Access bypasses /pwa/* only.
     @app.get("/pwa/{asset_path:path}")
     def serve_public_pwa_asset(asset_path: str):
-        return FileResponse(str(_pwa_asset(asset_path)), headers=_NO_CACHE_HEADERS)
+        headers = _INSTALL_HTML_HEADERS if asset_path == "install.html" else _NO_CACHE_HEADERS
+        return FileResponse(str(_pwa_asset(asset_path)), headers=headers)
 
     # Mount all built assets (Vite outputs assets/ subdir with hashed filenames)
     app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIR / "assets")), name="assets") if (

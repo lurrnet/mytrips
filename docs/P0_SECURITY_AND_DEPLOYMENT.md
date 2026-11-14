@@ -243,3 +243,35 @@ reach PASS, the root-scoped worker activates, and unknown files return 404.
 This browser check does not substitute for real Android WebAPK or iOS Safari
 device tests. `scripts/check_pwa_install.py --install-page` now also checks
 that the standalone installer JS is publicly served with the expected MIME.
+
+## Cloudflare HTML injection and the public PWA installer
+
+The unauthenticated `/pwa/install.html` is deliberately a tiny static page
+with one CSP-safe external script, `/pwa/install.js?v=1`. Cloudflare JavaScript
+Detections can inject a second inline script into HTML responses even when
+origin/container HTML has only one script. With `script-src 'self'`, this can
+violate CSP and cause the strict installer audit to fail. The FastAPI response
+for **only** `/pwa/install.html` therefore sets:
+
+```http
+Cache-Control: no-store, no-transform
+```
+
+Cloudflare documents that `no-transform` disables JavaScript Detections
+injection for that response. This is intentional: the installer contains no
+private data, while the root app and `/api/*` remain protected by Access.
+Do not relax the global CSP or disable zone-wide bot protections to fix this.
+This header does not necessarily disable *all* Cloudflare transformations;
+if the edge still adds an inline script, inspect the actual injected payload
+and relevant Cloudflare features, including Rocket Loader/Zaraz/analytics.
+
+After deployment check the header, script tags and functional resources:
+
+```sh
+curl -fsS -D - -o /dev/null https://mytrips.skybluestudio.net/pwa/install.html | grep -iE 'HTTP/|cache-control:|content-security-policy:'
+curl -fsS https://mytrips.skybluestudio.net/pwa/install.html | grep -oE '<script[^>]*>'
+python3 scripts/check_pwa_install.py --origin https://mytrips.skybluestudio.net --install-page
+```
+
+Expected: one `/pwa/install.js?v=1` script and HTTP header `no-transform`.
+Do not mark remote acceptance complete until the public check returns PASS.
