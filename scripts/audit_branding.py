@@ -21,6 +21,8 @@ LEGACY = {
     "backend/routes/version.py": ("PARTIU_VERSION",),
     "backend/trips/ical_service.py": ("@partiu",),
     "frontend/src/lib/apiCache.ts": ("partiu-api-", "Partiu API"),
+    # Legacy CacheStorage identifiers must remain to delete old private data.
+    "frontend/public/pwa/sw.js": ("partiu-api-", "partiu-static-"),
     "frontend/src/lib/notifications.ts": ("partiu_push_enabled", "Partiu PWA"),
 }
 
