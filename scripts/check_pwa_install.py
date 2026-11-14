@@ -4,8 +4,8 @@
 Run on the OCI host first (bypasses Cloudflare Access):
     python3 scripts/check_pwa_install.py --origin http://127.0.0.1:8030
 
-External Cloudflare Access-protected origins may return a login redirect; that
-is an expected authentication boundary, not proof that the app is broken.
+The site root can be behind Cloudflare Access. Use --install-page for a
+public check that only requests assets under /pwa/.
 """
 
 import argparse
@@ -173,6 +173,10 @@ def run(origin, install_page=False):
         check(response.headers.get("Service-Worker-Allowed") == "/",
               "Missing Service-Worker-Allowed: / for root-scope worker")
     print("PASS  Service worker HTTP response + root scope header")
+    if install_page:
+        # All public resources must remain inside the single Bypass prefix.
+        for p in (page_url, manifest_url, fallback_url):
+            check(urlsplit(p).path.startswith("/pwa/"), f"Public asset escaped /pwa/: {p}")
     print("\nPASS  MyTrips PWA installability resources are valid")
     print("NOTE  Android installation can still be blocked by Cloudflare Access, old browser cache, or phone settings")
 
