@@ -22,11 +22,16 @@ class ManifestLinkParser(HTMLParser):
     def __init__(self):
         super().__init__()
         self.links = []
+        self.icon_links = []
 
     def handle_starttag(self, tag, attrs):
         values = dict(attrs)
-        if tag == "link" and "manifest" in values.get("rel", "").split():
-            self.links.append(values)
+        if tag == "link":
+            rels = values.get("rel", "").split()
+            if "manifest" in rels:
+                self.links.append(values)
+            if "icon" in rels:
+                self.icon_links.append(values)
 
 
 def check(condition, error):
@@ -90,9 +95,17 @@ def run(origin):
     parser.feed(html.decode("utf-8", errors="replace"))
     check(len(parser.links) == 1, f"Expected exactly one manifest link, got {len(parser.links)}")
     link = parser.links[0]
-    check(link.get("crossorigin") == "use-credentials",
-          "Manifest link lacks crossorigin=use-credentials (required behind Cloudflare Access)")
-    print("PASS  HTML + credentialed manifest link")
+    check("crossorigin" not in link,
+          "Public manifest should use default credential-free fetch (remove crossorigin)")
+    fallback_icons = [icon for icon in parser.icon_links
+                      if icon.get("type") == "image/png" and icon.get("sizes") == "192x192"]
+    check(len(fallback_icons) == 1, "HTML must expose one explicit 192x192 PNG fallback icon")
+    fallback_url = urljoin(origin, fallback_icons[0].get("href", ""))
+    check(urlsplit(fallback_url).netloc == scheme.netloc, "HTML fallback icon is cross-origin")
+    fallback_mime, fallback_body = download(fallback_url)
+    check(fallback_mime == "image/png", "HTML fallback icon is not image/png")
+    validate_png(fallback_body, 192)
+    print("PASS  HTML + public manifest link + 192px PNG fallback icon")
 
     manifest_url = urljoin(origin, link.get("href", ""))
     mime, content = download(manifest_url)
