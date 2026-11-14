@@ -151,3 +151,26 @@ If the localhost checks pass but Android Chrome still reports it cannot install:
 Chrome on Android can only install a full WebAPK when its installability checks
 pass. A valid manifest and local CI are insufficient to prove an authenticated
 Cloudflare edge request works from the real Android browser.
+
+
+## Android launcher icon — Smart Meter Texas comparison
+
+The working Smart Meter Texas PWA manifest uses 192px `purpose: any` and
+512px `purpose: any maskable`. MyTrips now follows that same unambiguous
+selection pattern while retaining the **approved original A artwork** and the
+dark, safe-zone-padded `icon-maskable-512.png`. The Web UI favicon and login
+artwork are unchanged. The previous 512px regular image remains available on
+disk, but is no longer a competing 512px manifest icon.
+
+After deploying, run `python3 scripts/check_pwa_install.py --origin http://127.0.0.1:8030`
+and check the external manifest in Chrome. An authenticated Access browser may
+fetch icons successfully while the **WebAPK minting service** still cannot
+create an Android-installed app; a fallback home-screen shortcut may render a
+small square icon in a white circle. This code change improves icon selection
+but **does not guarantee a WebAPK**.
+
+On Android Chrome open `chrome://webapks` and look for MyTrips. Also check
+Android Settings → Apps. A WebAPK appears as an installed app; a browser
+shortcut may only exist on the home screen. If MyTrips is not a WebAPK, diagnose
+Chrome installation eligibility and Cloudflare Access/minting compatibility,
+not icon colors. Keep Cloudflare Access enabled.
