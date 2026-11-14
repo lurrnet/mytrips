@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 // Vite's `?raw` gives the worker's source as a string without needing node
 // globals in a browser-environment test file.
-import swSource from '../../sw.js?raw';
+import swSource from '../../public/pwa/sw.js?raw';
 
 type FetchHandler = (event: FakeFetchEvent) => void;
 
