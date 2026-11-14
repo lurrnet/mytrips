@@ -39,6 +39,10 @@ def audit() -> None:
     install_page = (ROOT / "frontend/public/pwa-install.html").read_text()
     if '<link rel="manifest" href="/manifest.json?v=6"' not in install_page:
         failures.append("Public PWA install page must reference the canonical manifest")
+    if 'href="/pwa-install.html"' not in (ROOT / "frontend/src/pages/SettingsPage.svelte").read_text():
+        failures.append("Settings must link to the official public PWA install page")
+    if '<a class="open-link" href="/">Open MyTrips</a>' not in install_page:
+        failures.append("Public PWA install page must link back to the protected app")
     if 'href="/icon-192.png?v=5"' not in install_page:
         failures.append("Public PWA install page must reference approved icon")
     if "navigator.serviceWorker.register('/sw.js'" not in install_page:
