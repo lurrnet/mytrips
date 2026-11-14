@@ -1,144 +1,207 @@
 /**
- * Tests for the service worker's fetch routing.
+ * Privacy regression tests for the MyTrips PWA Service Worker.
  *
- * `sw.js` runs in a worker global, so it is loaded here against a stubbed
- * `self` / `caches` and its registered `fetch` listener is driven directly.
- * That is worth the awkwardness for one reason: the bug this pins was invisible
- * in every other layer — saving a budget on a phone showed the old figure until
- * you navigated away and back, because the GET that followed the PUT beat the
- * cache purge and was served the pre-mutation copy.
+ * The SW must never read or write cached API responses. Earlier versions
+ * cached trips and authentication responses under cache names shared across
+ * accounts; upgrading must remove these caches before claiming clients.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-// Vite's `?raw` gives the worker's source as a string without needing node
-// globals in a browser-environment test file.
 import swSource from '../../public/pwa/sw.js?raw';
 
 type FetchHandler = (event: FakeFetchEvent) => void;
+type ActivateHandler = (event: FakeLifecycleEvent) => void;
 
 interface FakeFetchEvent {
   request: Request;
   respondWith: (r: Response | Promise<Response>) => void;
   waitUntil: (p: Promise<unknown>) => void;
 }
+interface FakeLifecycleEvent {
+  waitUntil: (p: Promise<unknown>) => void;
+}
 
-/** Records the order of cache deletes against network calls. */
-let timeline: string[] = [];
 let fetchHandler: FetchHandler;
-let cacheEntries: Map<string, Response>;
+let activateHandler: ActivateHandler;
+let cacheEntries: Map<string, Map<string, Response>>;
+let cachedNames: Set<string>;
+let timeline: string[];
 
 function loadServiceWorker() {
   timeline = [];
+  cachedNames = new Set([
+    'mytrips-api-v24',
+    'partiu-api-v6',
+    'mytrips-static-v24',
+    'mytrips-static-v25',
+    'other-app-data',
+  ]);
   cacheEntries = new Map();
-
-  const cache = {
-    keys: async () => [...cacheEntries.keys()].map((url) => new Request(url)),
-    delete: async (req: Request | string) => {
-      timeline.push('purge');
-      cacheEntries.delete(typeof req === 'string' ? req : req.url);
-      return true;
-    },
-    match: async (req: Request) => cacheEntries.get(req.url),
-    put: async (req: Request, res: Response) => {
-      cacheEntries.set(req.url, res);
-    },
+  const openCache = (name: string) => {
+    if (!cacheEntries.has(name)) cacheEntries.set(name, new Map());
+    cachedNames.add(name);
+    const entries = cacheEntries.get(name)!;
+    return {
+      keys: async () => [...entries.keys()].map((url) => new Request(url)),
+      delete: async (req: Request | string) => entries.delete(typeof req === 'string' ? req : req.url),
+      match: async (req: Request) => {
+        timeline.push('cache-match');
+        return entries.get(req.url);
+      },
+      put: async (req: Request, res: Response) => {
+        timeline.push('cache-put');
+        entries.set(req.url, res);
+      },
+    };
   };
 
-  const listeners: Record<string, FetchHandler> = {};
+  const listeners: Record<string, (event: any) => void> = {};
   const self = {
-    addEventListener: (type: string, fn: FetchHandler) => {
-      listeners[type] = fn;
-    },
+    addEventListener: (type: string, fn: (event: any) => void) => { listeners[type] = fn; },
     location: { origin: 'https://mytrips.test' },
-    clients: { claim: () => {} },
+    clients: { claim: async () => { timeline.push('claim'); } },
     skipWaiting: () => {},
-    caches: undefined as unknown,
   };
-
   const caches = {
-    open: async () => cache,
-    keys: async () => ['mytrips-api-v24'],
-    delete: async () => true,
-    match: async (req: Request) => cacheEntries.get(req.url),
+    open: async (name: string) => openCache(name),
+    keys: async () => [...cachedNames],
+    delete: async (name: string) => {
+      timeline.push('delete:' + name);
+      cacheEntries.delete(name);
+      return cachedNames.delete(name);
+    },
+    match: async (req: Request) => {
+      timeline.push('global-cache-match');
+      for (const map of cacheEntries.values()) {
+        const hit = map.get(req.url);
+        if (hit) return hit;
+      }
+      return undefined;
+    },
   };
 
-  // `fetch` is forwarded rather than captured, so a stub installed after the
-  // worker is loaded is still the one it calls.
   new Function('self', 'caches', 'fetch', swSource)(
     self,
     caches,
     (...args: [RequestInfo, RequestInit?]) => globalThis.fetch(...args),
   );
-
-  fetchHandler = listeners.fetch;
-  return { cache };
+  fetchHandler = listeners.fetch as FetchHandler;
+  activateHandler = listeners.activate as ActivateHandler;
+  return { openCache };
 }
 
 function dispatch(request: Request): Promise<Response> {
-  let responded: Promise<Response> | null = null;
+  let response: Promise<Response> | undefined;
   fetchHandler({
     request,
-    respondWith: (r) => {
-      responded = Promise.resolve(r);
-    },
+    respondWith: (value) => { response = Promise.resolve(value); },
     waitUntil: () => {},
   });
-  if (!responded) throw new Error('the worker did not respond to this request');
-  return responded;
+  if (!response) throw new Error('The worker did not respond to this request');
+  return response;
 }
 
-describe('service worker API routing', () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
+describe('privacy-first service worker', () => {
+  beforeEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
-  it('purges the API cache before a mutation resolves, not after', async () => {
-    loadServiceWorker();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => {
-        timeline.push('network');
-        return new Response('{}', { status: 200 });
-      }),
+  it.each([
+    ['GET', '/api/trips', undefined],
+    ['GET', '/api/auth/me', undefined],
+    ['GET', '/api', undefined],
+    ['POST', '/api/auth/login', '{}'],
+    ['PUT', '/api/trips/t1/budget', '{}'],
+    ['DELETE', '/api/trips/t1', undefined],
+  ])('uses network only for %s %s', async (method, path, body) => {
+    const { openCache } = loadServiceWorker();
+    openCache('mytrips-api-v24').put(
+      new Request('https://mytrips.test' + path),
+      new Response('{"private":"OLD ACCOUNT"}'),
     );
-    // Something in the cache to purge.
-    cacheEntries.set('https://mytrips.test/api/trips/t1/budget', new Response('{"amount":500}'));
+    timeline = [];
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      timeline.push('network');
+      return new Response('{"private":"CURRENT ACCOUNT"}', { status: 200 });
+    }));
 
-    await dispatch(
-      new Request('https://mytrips.test/api/trips/t1/budget', { method: 'PUT' }),
-    );
-
-    /* The whole point: by the time the page sees the PUT resolve, the stale copy
-     * is already gone. `waitUntil` made no such promise — it only keeps the
-     * worker alive — so the re-read could win the race and serve the old value. */
-    expect(timeline).toEqual(['network', 'purge']);
-    expect(cacheEntries.size).toBe(0);
+    const init: RequestInit = { method };
+    if (body !== undefined) init.body = body;
+    const response = await dispatch(new Request('https://mytrips.test' + path, init));
+    expect(await response.json()).toEqual({ private: 'CURRENT ACCOUNT' });
+    expect(timeline).toEqual(['network']);
   });
 
-  it('leaves the cache alone when the mutation fails', async () => {
+  it('fails a disconnected API fetch instead of falling back to stale private data', async () => {
     loadServiceWorker();
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 500 })));
-    cacheEntries.set('https://mytrips.test/api/trips/t1/budget', new Response('{"amount":500}'));
-
-    await dispatch(new Request('https://mytrips.test/api/trips/t1/budget', { method: 'PUT' }));
-
-    // A rejected write changed nothing on the server; dropping the cache would
-    // only cost a round trip.
-    expect(cacheEntries.size).toBe(1);
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('offline'); }));
+    await expect(dispatch(new Request('https://mytrips.test/api/trips'))).rejects.toThrow('offline');
+    expect(timeline).not.toContain('cache-match');
   });
 
-  it('does not handle cross-origin requests at all', () => {
+  it('deletes legacy API caches before claiming clients', async () => {
+    loadServiceWorker();
+    const work: Promise<unknown>[] = [];
+    activateHandler({ waitUntil: (promise) => { work.push(promise); } });
+    await Promise.all(work);
+    expect(cachedNames.has('mytrips-api-v24')).toBe(false);
+    expect(cachedNames.has('partiu-api-v6')).toBe(false);
+    expect(cachedNames.has('mytrips-static-v24')).toBe(false);
+    expect(cachedNames.has('mytrips-static-v25')).toBe(true);
+    expect(cachedNames.has('other-app-data')).toBe(true);
+    expect(timeline.at(-1)).toBe('claim');
+  });
+
+  it('never intercepts cross-origin requests', () => {
     loadServiceWorker();
     let responded = false;
     fetchHandler({
       request: new Request('https://basemaps.cartocdn.com/tile.png'),
-      respondWith: () => {
-        responded = true;
-      },
+      respondWith: () => { responded = true; },
       waitUntil: () => {},
     });
-
-    /* A dropped map tile must reach the page as a network error, not as this
-     * worker's JSON 503 — that is what the basemap reads as "blocked". */
     expect(responded).toBe(false);
+  });
+
+  it('does not intercept same-origin document downloads or installation resources', () => {
+    loadServiceWorker();
+    for (const path of ['/api/health', '/pwa/manifest.json', '/pwa/icon-192.png', '/documents/trip.pdf']) {
+      let intercepted = false;
+      fetchHandler({
+        request: new Request('https://mytrips.test' + path),
+        respondWith: () => { intercepted = true; },
+        waitUntil: () => {},
+      });
+      expect(intercepted).toBe(path === '/api/health');
+    }
+  });
+
+  it('caches fingerprinted static assets but not dynamic responses', async () => {
+    loadServiceWorker();
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response('const x=1', {
+        status: 200,
+        headers: { 'content-type': 'application/javascript' },
+      }),
+    ));
+    const req = new Request('https://mytrips.test/assets/index-hash.js');
+    await dispatch(req);
+    expect(timeline).toContain('cache-put');
+    timeline = [];
+    await dispatch(req);
+    expect(timeline).toContain('cache-match');
+    expect(timeline).not.toContain('cache-put');
+  });
+
+  it('caches only root app-shell HTML on navigation, never other HTML routes', async () => {
+    loadServiceWorker();
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response('<html>SPA</html>', { status: 200, headers: { 'content-type': 'text/html' } }),
+    ));
+    // Mode cannot be set in RequestInit; create an actual document navigation request.
+    const navigation = (url: string) => ({ url, method: 'GET', mode: 'navigate' }) as Request;
+    const rootResponse = await dispatch(navigation('https://mytrips.test/'));
+    expect(rootResponse.ok).toBe(true);
+    expect(timeline).toContain('cache-put');
+    timeline = [];
+    await dispatch(navigation('https://mytrips.test/private-document'));
+    expect(timeline).not.toContain('cache-put');
   });
 });
